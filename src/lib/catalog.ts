@@ -1,17 +1,22 @@
 import type { Booking, Settings, LoyaltyLevel } from './types'
 
 export type HallId = 'white' | 'beige' | 'grey' | 'black'
-export interface Hall { id: HallId; name: string; img: string; tone: string; line: string; features: string[] }
+export interface Hall { id: string; name: string; img: string; tone: string; line: string; features: string[]; video?: string; enabled?: boolean; noConfetti?: boolean; gallery?: string[] }
 
-export const HALLS: Hall[] = [
+const BASE_HALLS: Hall[] = [
   { id: 'white', name: 'WHITE', img: '/img/white.jpg', tone: '#E9E2D6', line: 'Светлые драпировки, жемчужная люстра и мягкий дневной свет из больших окон.', features: ['Окна в пол', 'Циклорама', 'Диван-честерфилд'] },
   { id: 'beige', name: 'BEIGE', img: '/img/beige.jpg', tone: '#B89B7A', line: 'Библиотека с аркой, бархатный диван и тёплый свет. Сейчас стоит новогодний декор.', features: ['Арка-библиотека', 'Бархат', 'Тёплый свет'] },
-  { id: 'grey', name: 'GREY', img: '/img/grey.jpg', tone: '#8E8E8A', line: 'Бетонные стены, хрустальная люстра и графичный свет. Конфетти здесь запрещено.', features: ['Бетон', 'Хрусталь', 'Графика'] },
+  { id: 'grey', name: 'GREY', img: '/img/grey.jpg', tone: '#8E8E8A', noConfetti: true, line: 'Бетонные стены, хрустальная люстра и графичный свет. Конфетти здесь запрещено.', features: ['Бетон', 'Хрусталь', 'Графика'] },
   { id: 'black', name: 'BLACK', img: '/img/black.jpg', tone: '#6B1E26', line: 'Красная сцена: бархатный занавес, хрустальные люстры и канделябры.', features: ['Бархатный занавес', 'Канделябры', 'Сцена'] },
 ]
-export const hallById = (id: string) => HALLS.find(h => h.id === id) ?? HALLS[0]
+/** Live list of enabled halls (mutated in place by applyCatalog when settings load) */
+export const HALLS: Hall[] = BASE_HALLS.map(h => ({ ...h }))
+/** Every hall incl. disabled ones (for old bookings and the editor) */
+export const ALL_HALLS: Hall[] = BASE_HALLS.map(h => ({ ...h }))
+export const hallById = (id: string): Hall => ALL_HALLS.find(h => h.id === id) ?? { id, name: id.toUpperCase(), img: '/img/table.jpg', tone: '#8E8E8A', line: '', features: [] }
 
-export const EQUIP = [
+export interface Equip { id: string; n: string; d?: string }
+const BASE_EQUIP: Equip[] = [
   { id: 'light', n: 'Доп. источник света', d: '2 уже входят в аренду' },
   { id: 'smoke', n: 'Генератор дыма' },
   { id: 'snow', n: 'Генератор снега', d: 'Уборка включена' },
@@ -22,7 +27,18 @@ export const EQUIP = [
   { id: 'jedi', n: 'Джедай-лампа RGB' },
   { id: 'rgb', n: 'Проекторная лампа RGB', d: '16 цветов' },
   { id: 'tripod', n: 'Штатив для камеры или телефона' },
-] as const
+]
+export const EQUIP: Equip[] = BASE_EQUIP.map(e => ({ ...e }))
+
+/** Sync the mutable catalogue with settings (halls, options). Call whenever settings change. */
+export function applyCatalog(S: Settings) {
+  const all = S.catalog?.halls?.length ? S.catalog.halls : BASE_HALLS
+  ALL_HALLS.splice(0, ALL_HALLS.length, ...all.map(h => ({ ...h })))
+  HALLS.splice(0, HALLS.length, ...ALL_HALLS.filter(h => h.enabled !== false))
+  const eq = S.catalog?.equip?.length ? S.catalog.equip : BASE_EQUIP
+  EQUIP.splice(0, EQUIP.length, ...eq.map(e => ({ ...e })))
+}
+export const noConfetti = (hall: string) => !!hallById(hall).noConfetti
 
 export const FINES: [string, number][] = [
   ['Несогласованные хлопушки', 20000], ['Нарушение правил студии', 10000], ['Загрязнение под покраску', 10000],
@@ -52,6 +68,16 @@ export const DEFAULT_SETTINGS: Settings = {
   night: 2000, guest: 1000, freeGuests: 6, confetti: 5000,
   equip: { light: 1500, smoke: 2000, snow: 10000, proj: 2000, laser: 2000, gobo_j: 1000, gobo_a: 2000, jedi: 1000, rgb: 1000, tripod: 1000 },
   loyalty: { enabled: true, basis: 'hours', levels: DEFAULT_LEVELS, maxRedeemPct: 30, welcome: 0 },
+  booking: { open: 0, close: 24, minHours: 1, maxHours: 12, daysAhead: 60, leadHours: 1, nightFrom: 21, nightTo: 9 },
+  announcement: { enabled: false, title: '', text: '', tone: 'gold' },
+  referral: { enabled: true, friendPct: 5, referrerPct: 5 },
+  reviewUrl: 'https://2gis.kz/almaty/search/Moloko%20Art%20Studios',
+  templates: {
+    contact: 'Здравствуйте, {имя}! Это Moloko Art Studios 🤍\n\nПолучили вашу заявку:\n{брони}\nСумма: {сумма}\n\nКоротко о правилах:\n• бронь подтверждается после 100% оплаты;\n• перенос или отмена меньше чем за 72 часа — удерживаем 50%, меньше чем за 24 часа — 100%;\n• час студии — 55 минут, гримёрка бесплатно за час до съёмки;\n• в зале GREY конфетти нельзя.\n\nКуда удобнее выставить счёт на оплату: Kaspi по этому номеру или другой номер?',
+    remind: 'Здравствуйте, {имя}! Напоминаем о съёмке в Moloko Art Studios:\n{брони}\n\nАдрес: {адрес}. Ждём вас за 10 минут до начала 🤍',
+    thanks: 'Спасибо, что выбрали Moloko Art Studios, {имя}! 🤍\n\nНам будет очень приятно, если вы оставите короткий отзыв — это помогает студии расти:\n{отзыв}\n\nА по этой ссылке ваши друзья получат скидку {скидка_друга}% на первую съёмку: {реф_ссылка}',
+    invite: 'Приглашение на съёмку в Moloko Art Studios ✨\n{брони}\nАдрес: {адрес}\n\nВсё о брони, карта и календарь: {приглашение}',
+  },
 }
 
 export function mergeSettings(raw: any): Settings {
@@ -60,10 +86,14 @@ export function mergeSettings(raw: any): Settings {
   const out: Settings = { ...d, ...raw, halls: { ...d.halls, ...(raw.halls || {}) }, equip: { ...d.equip, ...(raw.equip || {}) } }
   const l = raw.loyalty || {}
   out.loyalty = { ...d.loyalty, ...l, levels: Array.isArray(l.levels) && l.levels.length ? l.levels : d.loyalty.levels }
+  out.booking = { ...d.booking, ...(raw.booking || {}) }
+  out.announcement = { ...d.announcement, ...(raw.announcement || {}) }
+  out.referral = { ...d.referral, ...(raw.referral || {}) }
+  out.templates = { ...d.templates, ...(raw.templates || {}) }
   return out
 }
 
-export const isNight = (h: number) => h >= 21 || h < 9
+export const isNight = (h: number, S?: Settings) => h >= (S?.booking?.nightFrom ?? 21) || h < (S?.booking?.nightTo ?? 9)
 
 export interface QuoteInput { hall: string; start: number; hours: number; guests?: number; equip?: string[]; confetti?: boolean; makeup?: boolean }
 export function quote(b: QuoteInput, S: Settings) {
@@ -72,7 +102,7 @@ export function quote(b: QuoteInput, S: Settings) {
   const p = S.halls[b.hall as HallId] ?? 0
   lines.push([`Зал ${hallById(b.hall).name} · ${b.hours} ч`, p * b.hours])
   let nights = 0
-  for (let k = 0; k < b.hours; k++) if (isNight((b.start + k) % 24)) nights++
+  for (let k = 0; k < b.hours; k++) if (isNight((b.start + k) % 24, S)) nights++
   if (nights) lines.push([`Ночные часы · ${nights} ч`, nights * S.night])
   const extra = Math.max(0, (b.guests ?? 0) - S.freeGuests)
   if (extra) lines.push([`Гости сверх ${S.freeGuests} · ${extra} чел.`, extra * b.hours * S.guest])

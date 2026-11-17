@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Phone, MessageCircle, Pencil, CheckCircle2, Wallet, Ban, RotateCcw, Trash2, Plus, Users, Sparkles, PawPrint, Brush, Clock, CalendarDays, Gift, AlertTriangle, ChevronRight } from 'lucide-react'
+import { X, Phone, MessageCircle, Pencil, CheckCircle2, Wallet, Ban, RotateCcw, Trash2, Plus, Users, Sparkles, PawPrint, Brush, Clock, CalendarDays, Gift, AlertTriangle, ChevronRight, Send, Ticket, Heart, BellRing, ShieldQuestion, Layers, Copy, Share2 } from 'lucide-react'
+import { can, isOld } from './perm'
+import { messageFor, waMessage, waShare, inviteUrl, type TemplateKey } from '../lib/messages'
 import { useStudio } from './store'
 import { useUI } from './ui'
 import { useClient, revenueOf, fines as finesOf, levelTone } from './derive'
 import { hallById, EQUIP, FINES, PAY_METHODS, penalty as penaltyOf } from '../lib/catalog'
-import { Drawer, StatusPill, cx, toast } from '../ui/kit'
+import { Drawer, Sheet, StatusPill, cx, toast } from '../ui/kit'
 import { money, dLabel, timeRange, hoursLabel, fmtPhone, waLink, relTime, pad, num } from '../lib/format'
 import { fail } from './msg'
 import type { Booking } from '../lib/types'
@@ -21,12 +23,22 @@ export function BookingDrawer() {
 }
 
 function Body({ b }: { b: Booking }) {
-  const { me, updateBooking, deleteBooking, tx, staff } = useStudio()
+  const { me, updateBooking, deleteBooking, tx, staff, bookings, clients, request, requests } = useStudio()
   const { openBooking, editBooking, openClient, newBooking } = useUI()
   const client = useClient(b.status === 'block' ? null : b.phone)
   const owner = me?.role === 'owner'
   const hall = hallById(b.hall)
-  const [mode, setMode] = useState<null | 'pay' | 'cancel' | 'fine' | 'delete'>(null)
+  const [mode, setMode] = useState<null | 'pay' | 'cancel' | 'fine' | 'delete' | 'ask'>(null)
+  const [msg, setMsg] = useState<TemplateKey | null>(null)
+  const role = me?.role
+  const isBlock = b.status === 'block'
+  const writable = isBlock ? can(role, 'block') : can(role, 'book')
+  const locked = writable && !isBlock && isOld(b.date) && !can(role, 'editOld')
+  const canAct = writable && !locked
+  const canDelete = isBlock ? can(role, 'block') : can(role, 'deleteAny')
+  const group = b.groupId ? bookings.filter(x => x.groupId === b.groupId).sort((x, y) => x.date === y.date ? x.start - y.start : x.date < y.date ? -1 : 1) : [b]
+  const myReq = requests.find(r => r.bookingId === b.id && r.status === 'pending')
+  const refCode = clients.find(c => c.phone === b.phoneNorm)?.refCode
   const [busy, setBusy] = useState(false)
   const toPay = b.total - (b.bonusUsed || 0)
   const fineSum = finesOf(b)
@@ -72,6 +84,21 @@ function Body({ b }: { b: Booking }) {
         )}
         {client?.blocked && <Note tone="bad" icon={<AlertTriangle className="size-4" />}>Клиент в чёрном списке{client.note ? `: ${client.note}` : ''}</Note>}
 
+        {group.length > 1 && (
+          <div className="rounded-2xl p-3" style={{ background: 'var(--accent-soft)' }}>
+            <div className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--accent)' }}><Layers className="size-4" />Комбо-бронь · {group.length} части</div>
+            <div className="mt-2 flex flex-col gap-1">
+              {group.map(x => (
+                <button key={x.id} onClick={() => openBooking(x.id)} className={cx('flex items-center gap-2 text-[13px] text-left rounded-lg px-2 py-1', x.id === b.id ? 'bg-[var(--card-2)] font-medium' : 'hover:bg-[var(--card-2)]')}>
+                  <span className="size-2 rounded-full" style={{ background: hallById(x.hall).tone }} />{hallById(x.hall).name} · {dLabel(x.date, false)} · {timeRange(x.start, x.hours)}<StatusPill s={x.status} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {myReq && <Note tone="warn" icon={<ShieldQuestion className="size-4" />}>Ждёт решения владельца: {REQ_LABEL[myReq.kind]}{myReq.note ? ` — ${myReq.note}` : ''}</Note>}
+        {locked && !myReq && <Note tone="warn" icon={<ShieldQuestion className="size-4" />}>Бронь старше двух дней: изменить или отменить её можно только через запрос владельцу.</Note>}
+
         {/* facts */}
         <div className="grid grid-cols-2 gap-2">
           <Fact icon={<CalendarDays className="size-4" />} label="Дата" value={dLabel(b.date)} />
@@ -95,6 +122,7 @@ function Body({ b }: { b: Booking }) {
         {b.status !== 'block' && (
           <div className="rounded-2xl border hairline overflow-hidden">
             <Row k="Стоимость" v={money(b.total)} />
+            {(b.discount ?? 0) > 0 && <Row k={`Скидка по приглашению ${String(b.refPct ?? 5)}%`} v={'−' + money(Number(b.discount))} tone="var(--good)" />}
             {b.bonusUsed > 0 && <Row k="Списано бонусов" v={'−' + money(b.bonusUsed)} tone="var(--gold)" />}
             {(b.fines ?? []).map((f, i) => <Row key={i} k={`Штраф: ${f.name}`} v={'+' + money(f.amount)} tone="var(--bad)" onRemove={owner && b.status !== 'cancelled' ? () => run({ fines: (b.fines ?? []).filter((_, j) => j !== i) }, 'Штраф снят') : undefined} />)}
             {b.status === 'cancelled' && <Row k="Удержано при отмене" v={money(b.penalty || 0)} />}
@@ -108,11 +136,23 @@ function Body({ b }: { b: Booking }) {
           <div className="flex flex-wrap gap-1.5">{bonusTx.map(t => <span key={t.id} className="chip !h-8" style={{ color: t.amount > 0 ? 'var(--gold)' : 'var(--muted)' }}><Gift className="size-3.5" />{t.amount > 0 ? '+' : ''}{num(t.amount)} {t.kind === 'accrual' ? 'начислено' : t.kind === 'redeem' ? 'списано' : ''}</span>)}</div>
         )}
 
+        {/* talk to the client */}
+        {!isBlock && b.status !== 'cancelled' && can(role, 'book') && (
+          <div className="grid grid-cols-2 gap-2">
+            {b.status === 'new' && <CommBtn icon={<Send className="size-4" />} label="Связаться" sub="детали и счёт" onClick={() => setMsg('contact')} />}
+            {b.status === 'paid' && <CommBtn icon={<BellRing className="size-4" />} label="Напомнить" sub="о съёмке" onClick={() => setMsg('remind')} />}
+            {b.status === 'done' && <CommBtn icon={<Heart className="size-4" />} label="Благодарность" sub="и просьба об отзыве" onClick={() => setMsg('thanks')} />}
+            {(b.status === 'new' || b.status === 'paid') && <CommBtn icon={<Ticket className="size-4" />} label="Пригласительные" sub="для фотографа" onClick={() => setMsg('invite')} />}
+            {b.status === 'done' && <CommBtn icon={<Ticket className="size-4" />} label="Пригласительное" sub="ссылка на карточку" onClick={() => setMsg('invite')} />}
+          </div>
+        )}
+
         {/* inline flows */}
         <AnimatePresence mode="wait">
           {mode === 'pay' && <PayFlow key="pay" b={b} busy={busy} onCancel={() => setMode(null)} onDone={(m) => run({ status: 'paid', payMethod: m, paidAt: new Date().toISOString(), paidBy: me?.userId }, 'Оплата отмечена')} />}
           {mode === 'cancel' && <CancelFlow key="cancel" b={b} busy={busy} onCancel={() => setMode(null)} onDone={(pen, reason) => run({ status: 'cancelled', penalty: pen, reason, cancelledAt: new Date().toISOString(), cancelledBy: me?.userId }, 'Бронь отменена')} />}
           {mode === 'fine' && <FineFlow key="fine" busy={busy} onCancel={() => setMode(null)} onDone={(name, amount) => run({ fines: [...(b.fines ?? []), { name, amount, at: new Date().toISOString(), by: me?.userId }] }, 'Штраф добавлен')} />}
+          {mode === 'ask' && <AskFlow key="ask" busy={busy} onCancel={() => setMode(null)} onDone={async (kind, note) => { setBusy(true); try { await request({ bookingId: b.id, kind, note }); toast('Запрос отправлен владельцу'); setMode(null) } catch (e) { fail(e) } finally { setBusy(false) } }} />}
           {mode === 'delete' && (
             <Flow key="del" title={b.status === 'block' ? 'Снять блокировку?' : 'Удалить бронь навсегда?'} text={b.status === 'block' ? 'Время снова станет доступным для записи.' : 'Бронь исчезнет из отчётов. Обычно лучше отменить — тогда история сохранится.'}>
               <button className="btn btn-line flex-1" onClick={() => setMode(null)}>Назад</button>
@@ -129,21 +169,93 @@ function Body({ b }: { b: Booking }) {
       </div>
 
       {/* actions */}
-      {!mode && (
+      {!mode && writable && (
         <div className="sticky bottom-0 p-4 pt-3 border-t hairline safe-b flex flex-col gap-2" style={{ background: 'var(--panel, var(--bg))' }}>
-          {b.status === 'new' && <button className="btn btn-primary h-12 w-full" onClick={() => setMode('pay')}><Wallet className="size-4" />Отметить оплату · {money(toPay + fineSum)}</button>}
-          {b.status === 'paid' && <button className="btn btn-primary h-12 w-full" disabled={busy} onClick={() => run({ status: 'done', doneAt: new Date().toISOString() }, 'Съёмка завершена, бонусы начислены')}><CheckCircle2 className="size-4" />Съёмка состоялась</button>}
-          {b.status === 'cancelled' && <button className="btn btn-primary h-12 w-full" disabled={busy} onClick={() => run({ status: 'new', penalty: 0, reason: '' }, 'Бронь восстановлена')}><RotateCcw className="size-4" />Восстановить бронь</button>}
+          {locked ? (
+            <button className="btn btn-primary h-12 w-full" disabled={!!myReq} onClick={() => setMode('ask')}><ShieldQuestion className="size-4" />{myReq ? 'Запрос уже у владельца' : 'Попросить владельца изменить'}</button>
+          ) : <>
+            {b.status === 'new' && <button className="btn btn-primary h-12 w-full" onClick={() => setMode('pay')}><Wallet className="size-4" />Отметить оплату · {money(toPay + fineSum)}</button>}
+            {b.status === 'paid' && <button className="btn btn-primary h-12 w-full" disabled={busy} onClick={() => run({ status: 'done', doneAt: new Date().toISOString() }, 'Съёмка завершена, бонусы начислены')}><CheckCircle2 className="size-4" />Съёмка состоялась</button>}
+            {b.status === 'cancelled' && <button className="btn btn-primary h-12 w-full" disabled={busy} onClick={() => run({ status: 'new', penalty: 0, reason: '' }, 'Бронь восстановлена')}><RotateCcw className="size-4" />Восстановить бронь</button>}
+          </>}
           <div className="flex gap-2">
-            {b.status !== 'cancelled' && <button className="btn btn-line flex-1 h-11" onClick={() => editBooking(b.id)}><Pencil className="size-4" />Изменить</button>}
-            {(b.status === 'paid' || b.status === 'done') && <button className="btn btn-line flex-1 h-11" onClick={() => setMode('fine')}><Plus className="size-4" />Штраф</button>}
-            {(b.status === 'new' || b.status === 'paid') && <button className="btn btn-line flex-1 h-11" style={{ color: 'var(--bad)' }} onClick={() => setMode('cancel')}><Ban className="size-4" />Отменить</button>}
-            {b.status === 'done' && <button className="btn btn-line flex-1 h-11" onClick={() => { openBooking(null); newBooking({ hall: b.hall, name: b.name, phone: b.phone, kind: b.kind, guests: b.guests, hours: b.hours, start: b.start }) }}><RotateCcw className="size-4" />Повторить</button>}
-            {(b.status === 'block' || owner) && <button className="icon-btn !size-11 shrink-0" style={{ color: 'var(--bad)' }} onClick={() => setMode('delete')} aria-label="Удалить"><Trash2 className="size-4" /></button>}
+            {canAct && b.status !== 'cancelled' && <button className="btn btn-line flex-1 h-11" onClick={() => editBooking(b.id)}><Pencil className="size-4" />Изменить</button>}
+            {canAct && (b.status === 'paid' || b.status === 'done') && <button className="btn btn-line flex-1 h-11" onClick={() => setMode('fine')}><Plus className="size-4" />Штраф</button>}
+            {canAct && (b.status === 'new' || b.status === 'paid') && <button className="btn btn-line flex-1 h-11" style={{ color: 'var(--bad)' }} onClick={() => setMode('cancel')}><Ban className="size-4" />Отменить</button>}
+            {can(role, 'book') && b.status === 'done' && <button className="btn btn-line flex-1 h-11" onClick={() => { openBooking(null); newBooking({ hall: b.hall, name: b.name, phone: b.phone, kind: b.kind, guests: b.guests, hours: b.hours, start: b.start }) }}><RotateCcw className="size-4" />Повторить</button>}
+            {canDelete
+              ? <button className="icon-btn !size-11 shrink-0" style={{ color: 'var(--bad)' }} onClick={() => setMode('delete')} aria-label="Удалить"><Trash2 className="size-4" /></button>
+              : !isBlock && !locked && !myReq && <button className="icon-btn !size-11 shrink-0" title="Попросить владельца удалить" style={{ color: 'var(--muted)' }} onClick={() => setMode('ask')} aria-label="Запрос на удаление"><ShieldQuestion className="size-4" /></button>}
           </div>
         </div>
       )}
+      <MessageSheet k={msg} onClose={() => setMsg(null)} group={group} refCode={refCode} />
     </div>
+  )
+}
+
+const REQ_LABEL: Record<string, string> = { delete: 'удалить бронь', edit: 'изменить бронь', cancel: 'отменить бронь', refund: 'вернуть деньги', other: 'другое' }
+
+function CommBtn({ icon, label, sub, onClick }: { icon: React.ReactNode; label: string; sub: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-2.5 rounded-2xl p-3 text-left transition-colors hover:bg-[var(--card-3)] active:scale-[.98]" style={{ background: 'var(--card-2)' }}>
+      <span className="size-9 rounded-xl grid place-items-center shrink-0" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>{icon}</span>
+      <span className="min-w-0"><span className="block text-[13.5px] font-semibold truncate">{label}</span><span className="block text-[11.5px] truncate" style={{ color: 'var(--muted)' }}>{sub}</span></span>
+    </button>
+  )
+}
+
+const MSG_TITLE: Record<TemplateKey, string> = { contact: 'Сообщение клиенту', remind: 'Напоминание о съёмке', thanks: 'Благодарность и отзыв', invite: 'Пригласительные' }
+
+function MessageSheet({ k, onClose, group, refCode }: { k: TemplateKey | null; onClose: () => void; group: Booking[]; refCode?: string | null }) {
+  const S = useStudio(s => s.S)
+  const [text, setText] = useState('')
+  const b = group[0]
+  const key = k ?? 'contact'
+  const initial = b ? messageFor(key, S, group, refCode) : ''
+  const value = text || initial
+  const copy = async (t: string, what = 'Текст скопирован') => { try { await navigator.clipboard.writeText(t); toast(what) } catch { toast('Не удалось скопировать', 'err') } }
+  const share = async () => { try { await navigator.share({ title: 'Moloko Art Studios', text: value }) } catch { /* cancelled */ } }
+  return (
+    <Sheet open={!!k} onClose={() => { onClose(); setText('') }} title={k ? MSG_TITLE[k] : ''}>
+      {b && k && (
+        <div className="flex flex-col gap-3 pt-1">
+          {k === 'invite' && (
+            <a href={inviteUrl(b.id)} target="_blank" rel="noopener" className="relative h-36 rounded-2xl overflow-hidden block group">
+              <img src={hallById(b.hall).img} alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <span className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.75))' }} />
+              <span className="absolute left-4 bottom-3 right-4 text-white"><span className="block text-[11px] tracking-[.18em] uppercase opacity-80">Пригласительное · открыть</span><span className="block font-display text-[18px]">{group.map(x => hallById(x.hall).name).join(' + ')} · {dLabel(b.date, false)}</span></span>
+            </a>
+          )}
+          <textarea className="field !text-[14.5px] leading-relaxed" rows={k === 'contact' ? 12 : 8} value={value} onChange={e => setText(e.target.value)} />
+          <div className="text-[12px]" style={{ color: 'var(--muted)' }}>Можно поправить текст перед отправкой. Шаблон меняется в разделе «Сообщения».</div>
+          <div className="grid grid-cols-2 gap-2">
+            {k === 'invite'
+              ? <a className="btn btn-primary h-12 col-span-2" href={waShare(value)} target="_blank" rel="noopener"><MessageCircle className="size-4" />Отправить в WhatsApp</a>
+              : <a className="btn btn-primary h-12 col-span-2" href={waMessage(b.phone, value)} target="_blank" rel="noopener"><MessageCircle className="size-4" />Открыть WhatsApp клиента</a>}
+            <button className="btn btn-line h-11" onClick={() => copy(value)}><Copy className="size-4" />Копировать</button>
+            {k === 'invite'
+              ? <button className="btn btn-line h-11" onClick={() => copy(inviteUrl(b.id), 'Ссылка скопирована')}><Copy className="size-4" />Только ссылка</button>
+              : typeof navigator.share === 'function' ? <button className="btn btn-line h-11" onClick={share}><Share2 className="size-4" />Поделиться</button> : <a className="btn btn-line h-11" href={`tel:+${b.phoneNorm}`}><Phone className="size-4" />Позвонить</a>}
+          </div>
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
+function AskFlow({ busy, onCancel, onDone }: { busy: boolean; onCancel: () => void; onDone: (k: 'edit' | 'cancel' | 'delete' | 'refund', note: string) => void }) {
+  const [k, setK] = useState<'edit' | 'cancel' | 'delete' | 'refund'>('edit')
+  const [note, setNote] = useState('')
+  return (
+    <Flow title="Запрос владельцу" text="Опишите, что нужно сделать. Владелец получит уведомление и подтвердит или отклонит запрос.">
+      <div className="flex flex-wrap gap-1.5">{([['edit', 'Изменить'], ['cancel', 'Отменить'], ['refund', 'Вернуть деньги'], ['delete', 'Удалить']] as const).map(([id, n]) => <button key={id} className="chip" aria-pressed={k === id} onClick={() => setK(id)}>{n}</button>)}</div>
+      <textarea className="field w-full" rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Например: клиент перенёс съёмку на 25 ноября, 14:00, тот же зал" />
+      <div className="flex gap-2 w-full mt-1">
+        <button className="btn btn-line flex-1" onClick={onCancel}>Назад</button>
+        <button className="btn btn-primary flex-[2]" disabled={busy || note.trim().length < 3} onClick={() => onDone(k, note.trim())}>Отправить запрос</button>
+      </div>
+    </Flow>
   )
 }
 

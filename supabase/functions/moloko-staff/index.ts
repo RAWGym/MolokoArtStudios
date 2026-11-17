@@ -28,7 +28,9 @@ async function caller(req: Request) {
   return row as { user_id: string; role: string; login: string };
 }
 
-async function createAccount(login: string, name: string, password: string, role: "owner" | "admin", by: string | null) {
+const ROLES = ["owner", "admin", "accountant", "tech", "smm"];
+
+async function createAccount(login: string, name: string, password: string, role: string, by: string | null) {
   if (!LOGIN_RE.test(login)) return json({ error: "bad_login" }, 400);
   if (typeof password !== "string" || password.length < 6) return json({ error: "weak_password" }, 400);
   name = String(name || "").trim().slice(0, 80) || login;
@@ -60,7 +62,7 @@ Deno.serve(async (req) => {
     case "create": {
       const me = await caller(req);
       if (!me || me.role !== "owner") return json({ error: "forbidden" }, 403);
-      return createAccount(login, body.name, body.password, body.role === "owner" ? "owner" : "admin", me.user_id);
+      return createAccount(login, body.name, body.password, ROLES.includes(body.role) ? body.role : "admin", me.user_id);
     }
     case "set_disabled": {
       const me = await caller(req);
@@ -78,6 +80,15 @@ Deno.serve(async (req) => {
       if (typeof body.password !== "string" || body.password.length < 6) return json({ error: "weak_password" }, 400);
       const { error } = await admin.auth.admin.updateUserById(body.user_id, { password: body.password });
       if (error) return json({ error: "auth_error" }, 400);
+      return json({ ok: true });
+    }
+    case "set_role": {
+      const me = await caller(req);
+      if (!me || me.role !== "owner") return json({ error: "forbidden" }, 403);
+      if (body.user_id === me.user_id) return json({ error: "self" }, 400);
+      if (!ROLES.includes(body.role)) return json({ error: "bad_role" }, 400);
+      const { error } = await admin.from("moloko_staff").update({ role: body.role }).eq("user_id", body.user_id);
+      if (error) return json({ error: "db_error" }, 400);
       return json({ ok: true });
     }
     default:
