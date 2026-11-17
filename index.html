@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Moloko Art Studios — онлайн-бронь</title>
+  <meta name="description" content="Фотостудия Moloko в Алматы: залы WHITE, BEIGE, GREY, BLACK. Онлайн-бронь 24/7, бонусы за каждую съёмку." />
+  <meta name="theme-color" content="#FFF9ED" />
+  <link rel="manifest" href="/manifest.webmanifest" id="manifest" />
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/icons/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Moloko" />
+  <meta property="og:title" content="Moloko Art Studios — онлайн-бронь" />
+  <meta property="og:description" content="Четыре интерьерных зала в Алматы. Забронируйте за минуту." />
+  <meta property="og:image" content="/img/black.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@300;400;500;600&display=swap" />
+  <script>
+    (function (d) {
+      var studio = /^\/studio/.test(location.pathname);
+      d.dataset.app = studio ? 'studio' : 'widget';
+      if (studio) {
+        var t = 'dark';
+        try { t = localStorage.getItem('moloko.theme') || 'dark' } catch (e) {}
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        d.dataset.theme = t;
+        document.getElementById('manifest').href = '/manifest-studio.webmanifest';
+        document.querySelector('link[rel="apple-touch-icon"]').href = '/icons/studio-512.png';
+        document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#12100E' : '#EFE6D8';
+        document.title = 'Moloko Studio — CRM';
+      }
+    })(document.documentElement);
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
