@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw } from 'lucide-react'
-import { pagesFor, ROLE_LABEL } from './perm'
+import { pagesFor, ROLE_LABEL, can } from './perm'
 import { useStudio } from './store'
 import { useUI, type Page } from './ui'
 import { cx, Logo, LogoMark, Avatar, Sheet, toast } from '../ui/kit'
@@ -157,7 +157,7 @@ function Shell() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(true) }
-      if (e.key === 'n' && !(e.target as HTMLElement).closest('input,textarea,select') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); newBooking() }
+      if (e.key === 'n' && can(useStudio.getState().me?.role, 'book') && !(e.target as HTMLElement).closest('input,textarea,select') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); newBooking() }
     }
     addEventListener('keydown', h); return () => removeEventListener('keydown', h)
   }, [])
@@ -218,7 +218,7 @@ function Shell() {
             <span style={{ color: 'var(--muted)' }}>{live === 'live' ? 'Онлайн' : live === 'connecting' ? 'Подключение' : 'Офлайн'}</span>
           </span>
           {typeof Notification !== 'undefined' && Notification.permission === 'default' && <button className="icon-btn hidden sm:grid glass !rounded-full" onClick={askNotify} title="Уведомления о заявках"><Bell className="size-4" /></button>}
-          <button className="btn btn-primary h-10 md:h-11 px-4" onClick={() => newBooking()}><Plus className="size-4" /><span className="hidden sm:inline">Бронь</span></button>
+          {can(me?.role, 'book') && <button className="btn btn-primary h-10 md:h-11 px-4" onClick={() => newBooking()}><Plus className="size-4" /><span className="hidden sm:inline">Бронь</span></button>}
         </div>
       </header>
 

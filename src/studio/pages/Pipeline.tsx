@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Wallet, CheckCircle2, Clock, Inbox, LayoutGrid, List } from 'lucide-react'
 import { useStudio } from '../store'
+import { can } from '../perm'
 import { useUI } from '../ui'
 import { startOf, toCollect, revenueOf } from '../derive'
 import { PageHead } from '../common'
@@ -21,7 +22,7 @@ const COLS: { s: Status; hint: string; tone: string }[] = [
 export default function Pipeline() {
   const { bookings, me, updateBooking } = useStudio()
   const { openBooking } = useUI()
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
   const [view, setView] = useState<'board' | 'list'>('board')
   const [q, setQ] = useState('')
   const [hall, setHall] = useState<string>('all')

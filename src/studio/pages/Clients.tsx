@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search, UserPlus, Users, Ban } from 'lucide-react'
 import { useStudio } from '../store'
+import { can } from '../perm'
 import { useUI } from '../ui'
 import { useClients, levelTone } from '../derive'
 import { PageHead } from '../common'
@@ -15,7 +16,7 @@ export default function Clients() {
   const { me, S, upsertClient } = useStudio()
   const { openClient } = useUI()
   const all = useClients()
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
   const [q, setQ] = useState('')
   const [lvl, setLvl] = useState('all')
   const [sort, setSort] = useState<Sort>('recent')

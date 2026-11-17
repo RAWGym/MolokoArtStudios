@@ -9,7 +9,7 @@ import { num, relTime, fmtPhone } from '../../lib/format'
 import { fail } from '../msg'
 import type { Settings, LoyaltyLevel } from '../../lib/types'
 
-const KIND: Record<string, string> = { accrual: 'за съёмку', redeem: 'оплата бонусами', manual: 'вручную', welcome: 'приветственные' }
+const KIND: Record<string, string> = { accrual: 'за съёмку', redeem: 'оплата бонусами', manual: 'вручную', welcome: 'приветственные', referral: 'за друга' }
 
 export default function Loyalty() {
   const { S, tx, staff, saveSettings } = useStudio()

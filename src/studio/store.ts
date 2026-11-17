@@ -37,7 +37,7 @@ interface State {
   addBonus(phone: string, amount: number, note: string): Promise<void>
   saveSettings(S: Settings): Promise<void>
   loadAudit(): Promise<void>
-  staffCreate(p: { login: string; name: string; password: string; role: 'owner' | 'admin' }): Promise<void>
+  staffCreate(p: { login: string; name: string; password: string; role: Role }): Promise<void>
   staffDisable(userId: string, disabled: boolean): Promise<void>
   staffPassword(userId: string, password: string): Promise<void>
   staffRole(userId: string, role: Role): Promise<void>

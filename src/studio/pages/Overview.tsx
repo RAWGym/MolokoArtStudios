@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CalendarCheck, Gauge, Hourglass, Wallet, Sparkles, Cake, ArrowUpRight, Inbox, Plus } from 'lucide-react'
 import { useStudio } from '../store'
+import { can } from '../perm'
 import { useUI } from '../ui'
 import { useClients, active, revenueOf, toCollect, busyHours, startOf, endOf } from '../derive'
 import { Card, PageHead, Kpi, AreaChart } from '../common'
@@ -13,7 +14,7 @@ export default function Overview() {
   const { me, bookings } = useStudio()
   const { openBooking, go, newBooking, openClient } = useUI()
   const clients = useClients()
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
   const [range, setRange] = useState<'week' | 'month' | 'year'>('month')
   const t = today()
   const now = new Date()
