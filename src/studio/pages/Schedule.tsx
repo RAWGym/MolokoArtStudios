@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Moon, Plus, Lock } from 'lucide-react'
 import { useStudio } from '../store'
+import { can } from '../perm'
 import { useUI } from '../ui'
 import { active } from '../derive'
 import { PageHead } from '../common'
@@ -21,7 +22,8 @@ export default function Schedule() {
   useEffect(() => { if (scheduleDate) setDate(scheduleDate) }, [scheduleDate])
   const d = parseYmd(date)
   const shift = (n: number) => setDate(ymd(addDays(d, view === 'week' ? n * 7 : n)))
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
+  const canBook = can(me?.role, 'book'), canBlock = can(me?.role, 'block'), oldOk = can(me?.role, 'editOld')
 
   const strip = useMemo(() => Array.from({ length: 21 }, (_, i) => ymd(addDays(new Date(), i - 3))), [])
   const countBy = useMemo(() => { const m: Record<string, number> = {}; for (const b of bookings) if (active(b) && b.status !== 'block') m[b.date] = (m[b.date] ?? 0) + 1; return m }, [bookings])
@@ -33,7 +35,7 @@ export default function Schedule() {
       <PageHead title="Расписание" sub={view === 'day' ? dLabel(date) : `Неделя с ${weekStart(d).getDate()} ${MON_S[weekStart(d).getMonth()]}`}
         actions={<>
           <Segmented value={view} onChange={setView} items={[['day', 'День'], ['week', 'Неделя']]} />
-          <button className="btn btn-line btn-sm h-10" onClick={() => newBooking({ mode: 'block', date })}><Lock className="size-4" /><span className="hidden sm:inline">Закрыть зал</span></button>
+          {canBlock && <button className="btn btn-line btn-sm h-10" onClick={() => newBooking({ mode: 'block', date })}><Lock className="size-4" /><span className="hidden sm:inline">Закрыть зал</span></button>}
         </>} />
 
       <div className="glass p-2 md:p-2.5 flex items-center gap-2 mb-3 md:mb-4">
@@ -56,7 +58,7 @@ export default function Schedule() {
       </div>
 
       {view === 'day'
-        ? <DayGrid date={date} bookings={bookings} night={night} setNight={setNight} onNew={(hall, start) => newBooking({ hall, date, start })} onOpen={openBooking} owner={owner} />
+        ? <DayGrid date={date} bookings={bookings} night={night} setNight={setNight} onNew={(canBook || canBlock) ? (hall, start) => newBooking(canBook ? { hall, date, start } : { hall, date, start, mode: 'block' }) : null} onOpen={openBooking} owner={owner} oldOk={oldOk} />
         : <Week date={date} bookings={bookings} onOpen={openBooking} onDay={s => { setDate(s); setView('day') }} />}
     </>
   )
@@ -64,7 +66,7 @@ export default function Schedule() {
 
 const weekStart = (d: Date) => addDays(d, -((d.getDay() + 6) % 7))
 
-function DayGrid({ date, bookings, night, setNight, onNew, onOpen, owner }: { date: string; bookings: Booking[]; night: boolean; setNight: (v: boolean) => void; onNew: (hall: string, start: number) => void; onOpen: (id: string) => void; owner: boolean }) {
+function DayGrid({ date, bookings, night, setNight, onNew, onOpen, owner, oldOk }: { date: string; bookings: Booking[]; night: boolean; setNight: (v: boolean) => void; onNew: ((hall: string, start: number) => void) | null; onOpen: (id: string) => void; owner: boolean; oldOk: boolean }) {
   const from = night ? 0 : 8, to = 24
   const hours = Array.from({ length: to - from }, (_, i) => from + i)
   const prev = ymd(addDays(parseYmd(date), -1))
@@ -114,7 +116,7 @@ function DayGrid({ date, bookings, night, setNight, onNew, onOpen, owner }: { da
               {hours.map(H => {
                 const past = isToday && H < now.getHours() || date < today()
                 return (
-                  <button key={H} disabled={past && !owner} onClick={() => onNew(h.id, H)} className="group w-full border-t hairline flex items-center justify-center disabled:cursor-default" style={{ height: ROW, background: H >= 21 || H < 9 ? 'color-mix(in oklab, var(--card-2) 60%, transparent)' : undefined }}>
+                  <button key={H} disabled={!onNew || (past && !oldOk)} onClick={() => onNew?.(h.id, H)} className="group w-full border-t hairline flex items-center justify-center disabled:cursor-default" style={{ height: ROW, background: H >= 21 || H < 9 ? 'color-mix(in oklab, var(--card-2) 60%, transparent)' : undefined }}>
                     <span className="opacity-0 group-hover:opacity-100 group-enabled:group-hover:opacity-100 transition-opacity text-[12px] flex items-center gap-1" style={{ color: 'var(--accent)' }}><Plus className="size-3.5" />{pad(H)}:00</span>
                   </button>
                 )

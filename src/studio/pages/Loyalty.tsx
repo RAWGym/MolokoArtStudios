@@ -9,7 +9,7 @@ import { num, relTime, fmtPhone } from '../../lib/format'
 import { fail } from '../msg'
 import type { Settings, LoyaltyLevel } from '../../lib/types'
 
-const KIND: Record<string, string> = { accrual: 'за съёмку', redeem: 'оплата бонусами', manual: 'вручную', welcome: 'приветственные' }
+const KIND: Record<string, string> = { accrual: 'за съёмку', redeem: 'оплата бонусами', manual: 'вручную', welcome: 'приветственные', referral: 'за друга' }
 
 export default function Loyalty() {
   const { S, tx, staff, saveSettings } = useStudio()
@@ -47,7 +47,7 @@ export default function Loyalty() {
         <Kpi label="Потрачено всего" value={redeemed} format={num} icon={<ArrowDownRight className="size-4" />} delay={.15} />
       </div>
 
-      <div className="grid lg:grid-cols-[1.2fr_1fr] gap-3 md:gap-4 mt-3 md:mt-4 items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3 md:gap-4 mt-3 md:mt-4 items-start">
         <Card title="Правила программы" delay={.1} action={<Switch on={L.enabled} onChange={v => setL({ ...L, enabled: v })} label="Программа включена" />}>
           <div className="flex flex-col gap-5" style={{ opacity: L.enabled ? 1 : .5 }}>
             <div>

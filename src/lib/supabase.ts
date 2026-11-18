@@ -1,25 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Booking, BonusTx, ClientRow, Staff, AuditRow } from './types'
+import type { Booking, BonusTx, ClientRow, Staff, AuditRow, MoneyRow, Cert, RequestRow } from './types'
 
 // Public values: the publishable key is designed to live in the browser; access is enforced by RLS.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://erztkmhaehqpgqgfwjsh.supabase.co'
 export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable__OqYSDfMSkRRGh2JtF9HFw_fynikyCn'
 export const STAFF_DOMAIN = 'staff.moloko.invalid'
+export const CLIENT_DOMAIN = 'client.moloko.invalid'
+export const IS_STUDIO = typeof location !== 'undefined' && /^\/studio/.test(location.pathname)
 
+// Staff (CRM) and clients (widget cabinet) keep separate sessions, so one browser can hold both.
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, storageKey: 'moloko.auth' },
+  auth: { persistSession: true, autoRefreshToken: true, storageKey: IS_STUDIO ? 'moloko.auth' : 'moloko.client' },
   realtime: { params: { eventsPerSecond: 5 } },
 })
 
 /* ------------------------------------------------------------ row mapping */
-const CORE = new Set(['id', 'hall', 'date', 'start', 'hours', 'status', 'name', 'phone', 'phoneNorm', 'total', 'bonusUsed', 'source', 'demo', 'createdAt', 'updatedAt', 'createdBy'])
+const CORE = new Set(['id', 'hall', 'date', 'start', 'hours', 'status', 'name', 'phone', 'phoneNorm', 'total', 'bonusUsed', 'source', 'demo', 'createdAt', 'updatedAt', 'createdBy', 'groupId'])
 
 export function fromRow(r: any): Booking {
   return {
     ...(r.extra || {}),
     id: r.id, hall: r.hall, date: r.date, start: r.start_hour, hours: r.hours, status: r.status,
     name: r.name ?? '', phone: r.phone ?? '', phoneNorm: r.phone_norm ?? '', total: r.total ?? 0, bonusUsed: r.bonus_used ?? 0,
-    source: r.source ?? '', demo: !!r.demo, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by,
+    source: r.source ?? '', demo: !!r.demo, groupId: r.group_id ?? null, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by,
   }
 }
 export function toRow(b: Partial<Booking>, base?: Booking) {
@@ -34,6 +37,7 @@ export function toRow(b: Partial<Booking>, base?: Booking) {
       case 'bonusUsed': row.bonus_used = v; break
       case 'createdAt': row.created_at = v; break
       case 'createdBy': row.created_by = v; break
+      case 'groupId': row.group_id = v; break
       case 'hall': case 'date': case 'hours': case 'status': case 'name': case 'phone': case 'total': case 'source': case 'demo': row[k] = v; break
       default: extra[k] = v
     }
@@ -41,9 +45,12 @@ export function toRow(b: Partial<Booking>, base?: Booking) {
   row.extra = extra
   return row
 }
-export const clientFromRow = (r: any): ClientRow => ({ phone: r.phone, name: r.name, note: r.note, tags: r.tags ?? [], birthday: r.birthday, blocked: r.blocked, createdAt: r.created_at })
+export const clientFromRow = (r: any): ClientRow => ({ phone: r.phone, name: r.name, note: r.note, tags: r.tags ?? [], birthday: r.birthday, blocked: r.blocked, createdAt: r.created_at, refCode: r.ref_code ?? null, refBy: r.ref_by ?? null })
 export const txFromRow = (r: any): BonusTx => ({ id: r.id, phone: r.phone, amount: r.amount, kind: r.kind, bookingId: r.booking_id, note: r.note, createdAt: r.created_at, createdBy: r.created_by })
 export const staffFromRow = (r: any): Staff => ({ userId: r.user_id, login: r.login, name: r.name, role: r.role, disabled: r.disabled, createdAt: r.created_at })
+export const moneyFromRow = (r: any): MoneyRow => ({ id: r.id, date: r.date, kind: r.kind, category: r.category, amount: r.amount, method: r.method, note: r.note, bookingId: r.booking_id, certId: r.cert_id, demo: !!r.demo, createdAt: r.created_at, createdBy: r.created_by })
+export const certFromRow = (r: any): Cert => ({ id: r.id, code: r.code, kind: r.kind, title: r.title, phone: r.phone, name: r.name, amount: r.amount, hours: r.hours, price: r.price, uses: r.uses ?? [], status: r.status, expires: r.expires, note: r.note, createdAt: r.created_at, createdBy: r.created_by })
+export const requestFromRow = (r: any): RequestRow => ({ id: r.id, bookingId: r.booking_id, kind: r.kind, payload: r.payload ?? {}, note: r.note, status: r.status, createdAt: r.created_at, createdBy: r.created_by, decidedAt: r.decided_at, decidedBy: r.decided_by, answer: r.answer ?? '' })
 export const auditFromRow = (r: any): AuditRow => ({ id: r.id, at: r.at, actor: r.actor, action: r.action, bookingId: r.booking_id, summary: r.summary })
 
 /* ------------------------------------------------------------ errors */
@@ -70,9 +77,11 @@ export async function selectAll<T>(table: string, map: (r: any) => T, order = 'c
 }
 
 /* ------------------------------------------------------------ staff edge function */
-export async function staffFn<T = any>(body: Record<string, unknown>): Promise<T> {
+export const staffFn = <T = any>(body: Record<string, unknown>) => callFn<T>('moloko-staff', body)
+export const clientFn = <T = any>(body: Record<string, unknown>) => callFn<T>('moloko-client', body)
+async function callFn<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data: { session } } = await sb.auth.getSession()
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/moloko-staff`, {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
     body: JSON.stringify(body),
@@ -83,3 +92,13 @@ export async function staffFn<T = any>(body: Record<string, unknown>): Promise<T
 }
 
 export const loginEmail = (login: string) => `${login.trim().toLowerCase()}@${STAFF_DOMAIN}`
+export const clientEmail = (phone: string) => `${phone.replace(/\D/g, '')}@${CLIENT_DOMAIN}`
+
+/** Upload a hall photo or video to the public media bucket and return its URL */
+export async function uploadMedia(file: File, folder = 'halls'): Promise<string> {
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const path = `${folder}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await sb.storage.from('moloko-media').upload(path, file, { cacheControl: '31536000', contentType: file.type, upsert: false })
+  if (error) throw new ApiError(/row-level|policy|not found|bucket/i.test(error.message) ? 'forbidden' : 'upload_failed', error.message)
+  return sb.storage.from('moloko-media').getPublicUrl(path).data.publicUrl
+}

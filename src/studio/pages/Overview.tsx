@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CalendarCheck, Gauge, Hourglass, Wallet, Sparkles, Cake, ArrowUpRight, Inbox, Plus } from 'lucide-react'
 import { useStudio } from '../store'
+import { can } from '../perm'
 import { useUI } from '../ui'
 import { useClients, active, revenueOf, toCollect, busyHours, startOf, endOf } from '../derive'
 import { Card, PageHead, Kpi, AreaChart } from '../common'
@@ -13,7 +14,7 @@ export default function Overview() {
   const { me, bookings } = useStudio()
   const { openBooking, go, newBooking, openClient } = useUI()
   const clients = useClients()
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
   const [range, setRange] = useState<'week' | 'month' | 'year'>('month')
   const t = today()
   const now = new Date()
@@ -71,7 +72,7 @@ export default function Overview() {
           : <Kpi label="Часов за месяц" value={monthHours} format={n => num(n)} sub="забронировано" icon={<Wallet className="size-4" />} delay={.15} />}
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-3 md:gap-4 mt-3 md:mt-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3 md:gap-4 mt-3 md:mt-4">
         <Card delay={.1} title={<span className="flex items-baseline gap-2">{owner ? 'Выручка' : 'Часы в залах'}<span className="font-display text-[18px] num" style={{ color: 'var(--accent)' }}>{owner ? money(total) : `${num(total)} ч`}</span></span>} action={<Segmented value={range} onChange={setRange} items={[['week', 'Неделя'], ['month', 'Месяц'], ['year', 'Год']]} />}>
           <AreaChart data={series} height={230} format={owner ? money : (n => `${n} ч`)} />
         </Card>

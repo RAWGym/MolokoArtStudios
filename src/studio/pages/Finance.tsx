@@ -1,15 +1,31 @@
-import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, Wallet, Receipt, Hourglass, Gift, Scale, TrendingUp } from 'lucide-react'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Download, Wallet, Hourglass, Gift, TrendingUp, ArrowDownRight, PiggyBank } from 'lucide-react'
 import { useStudio } from '../store'
 import { useUI } from '../ui'
 import { revenueOf, toCollect, fines } from '../derive'
 import { Card, PageHead, Kpi, AreaChart, Bars } from '../common'
 import { HALLS, hallById, PAY_METHODS } from '../../lib/catalog'
-import { StatusPill } from '../../ui/kit'
+import { StatusPill, Segmented } from '../../ui/kit'
+import { EXPENSE_CATS } from './financeLedger'
+
+const Ledger = lazy(() => import('./financeLedger'))
+const Certs = lazy(() => import('./financeCerts'))
+const Statement = lazy(() => import('./financeStatement'))
+
+type Tab = 'month' | 'ledger' | 'certs' | 'statement'
+export default function Finance() {
+  const [tab, setTab] = useState<Tab>('month')
+  return (
+    <>
+      <div className="mb-4 -mt-1 overflow-x-auto no-scrollbar"><Segmented value={tab} onChange={setTab} items={[['month', 'Месяц'], ['ledger', 'Движения'], ['certs', 'Сертификаты'], ['statement', 'Выписка']]} /></div>
+      <Suspense fallback={<div className="skel h-72" />}>{tab === 'month' ? <MonthReport /> : tab === 'ledger' ? <Ledger /> : tab === 'certs' ? <Certs /> : <Statement />}</Suspense>
+    </>
+  )
+}
 import { money, compact, num, ymd, dShort, MON_NOM, pad, timeRange } from '../../lib/format'
 
-export default function Finance() {
-  const { bookings, tx } = useStudio()
+function MonthReport() {
+  const { bookings, tx, money: ledger } = useStudio()
   const { openBooking } = useUI()
   const now = new Date()
   const [ym, setYm] = useState<[number, number]>([now.getFullYear(), now.getMonth()])
@@ -27,6 +43,10 @@ export default function Finance() {
   const fineSum = m.reduce((s, b) => s + (b.status === 'paid' || b.status === 'done' ? fines(b) : 0), 0)
   const penalties = m.filter(b => b.status === 'cancelled').reduce((s, b) => s + (b.penalty || 0), 0)
   const bonusSpent = m.filter(b => b.status === 'paid' || b.status === 'done').reduce((s, b) => s + (b.bonusUsed || 0), 0)
+  const other = ledger.filter(x => x.date.startsWith(key))
+  const otherIn = other.filter(x => x.kind === 'income').reduce((s, x) => s + x.amount, 0)
+  const expense = other.filter(x => x.kind === 'expense').reduce((s, x) => s + x.amount, 0)
+  const byExp = EXPENSE_CATS.map(c => ({ label: c, value: other.filter(x => x.kind === 'expense' && x.category === c).reduce((s, x) => s + x.amount, 0), color: 'var(--bad)' })).filter(x => x.value > 0)
   const accrued = tx.filter(t => t.amount > 0 && t.createdAt.startsWith(key)).reduce((s, t) => s + t.amount, 0)
 
   const days = new Date(ym[0], ym[1] + 1, 0).getDate()
@@ -58,13 +78,13 @@ export default function Finance() {
         </>} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <Kpi label="Выручка" value={revenue} format={money} tone="var(--gold)" icon={<Wallet className="size-4" />} sub={delta === null ? 'нет данных за прошлый месяц' : <span style={{ color: delta >= 0 ? 'var(--good)' : 'var(--bad)' }}>{delta >= 0 ? '+' : ''}{delta}% к {MON_NOM[(ym[1] + 11) % 12].toLowerCase()}</span>} />
-        <Kpi label="Средний чек" value={avg} format={money} icon={<Receipt className="size-4" />} sub={`${paidCount} оплаченных броней`} delay={.05} />
-        <Kpi label="Ожидается" value={pending} format={money} icon={<Hourglass className="size-4" />} tone={pending ? 'var(--warn)' : undefined} sub="брони без оплаты" delay={.1} />
-        <Kpi label="Штрафы и удержания" value={fineSum + penalties} format={money} icon={<Scale className="size-4" />} sub={`штрафы ${compact(fineSum)} · отмены ${compact(penalties)}`} delay={.15} />
+        <Kpi label="Доходы" value={revenue + otherIn} format={money} tone="var(--gold)" icon={<Wallet className="size-4" />} sub={delta === null ? `брони ${compact(revenue)} · прочее ${compact(otherIn)}` : <span style={{ color: delta >= 0 ? 'var(--good)' : 'var(--bad)' }}>брони {delta >= 0 ? '+' : ''}{delta}% к {MON_NOM[(ym[1] + 11) % 12].toLowerCase()}</span>} />
+        <Kpi label="Расходы" value={expense} format={money} icon={<ArrowDownRight className="size-4" />} tone={expense ? 'var(--bad)' : undefined} sub={byExp[0] ? `больше всего: ${byExp.sort((x, y) => y.value - x.value)[0].label.toLowerCase()}` : 'добавьте во вкладке «Движения»'} delay={.05} />
+        <Kpi label="Прибыль" value={revenue + otherIn - expense} format={money} icon={<PiggyBank className="size-4" />} tone={revenue + otherIn - expense >= 0 ? 'var(--good)' : 'var(--bad)'} sub={`средний чек ${compact(avg)} ₸ · ${paidCount} оплат`} delay={.1} />
+        <Kpi label="Ожидается" value={pending} format={money} icon={<Hourglass className="size-4" />} tone={pending ? 'var(--warn)' : undefined} sub={`без оплаты · штрафы ${compact(fineSum + penalties)}`} delay={.15} />
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-3 md:gap-4 mt-3 md:mt-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3 md:gap-4 mt-3 md:mt-4">
         <Card title="По дням" delay={.1}><AreaChart data={series} height={220} format={money} highlightLast={false} /></Card>
         <Card title="По залам" delay={.15}>
           <Bars items={byHall} format={n => `${compact(n)} ₸`} />
@@ -76,6 +96,7 @@ export default function Finance() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
+        {byExp.length > 0 && <Card title="Расходы по статьям" delay={.18} className="md:col-span-2">{<Bars items={byExp} format={n => `${compact(n)} ₸`} />}</Card>}
         <Card title="Способы оплаты" delay={.2}>{byPay.length ? <Bars items={byPay} format={n => `${compact(n)} ₸`} /> : <Muted />}</Card>
         <Card title="Откуда пришли деньги" delay={.25}>{bySrc.length ? <Bars items={bySrc} format={n => `${compact(n)} ₸`} /> : <Muted />}</Card>
       </div>

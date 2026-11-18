@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { X, Phone, MessageCircle, CalendarPlus, Gift, Plus, Minus, Ban, Cake, Save } from 'lucide-react'
+import { X, Phone, MessageCircle, CalendarPlus, Gift, Plus, Minus, Ban, Cake, Save, UserRound, BadgeCheck, KeyRound, Link2, Copy } from 'lucide-react'
+import { can } from './perm'
+import { refUrl } from '../lib/messages'
 import { useStudio } from './store'
 import { useUI } from './ui'
 import { useClient, levelTone, revenueOf } from './derive'
@@ -16,12 +18,19 @@ export function ClientDrawer() {
   return <Drawer open={!!c} onClose={() => openClient(null)} width={520}>{c && <Body key={c.phone} c={c} />}</Drawer>
 }
 
-const KIND: Record<string, string> = { accrual: 'Начислено за съёмку', redeem: 'Списано в оплату', manual: 'Вручную', welcome: 'Приветственные' }
+const KIND: Record<string, string> = { accrual: 'Начислено за съёмку', redeem: 'Списано в оплату', manual: 'Вручную', welcome: 'Приветственные', referral: 'За приглашённого друга' }
 
 function Body({ c }: { c: Client }) {
-  const { me, tx, S, staff, upsertClient, addBonus } = useStudio()
+  const { me, tx, S, staff, clients: rows, accounts, upsertClient, addBonus, verifyAccount, resetClientPassword } = useStudio()
   const { openClient, openBooking, newBooking } = useUI()
-  const owner = me?.role === 'owner'
+  const owner = can(me?.role, 'seeMoney')
+  const writable = can(me?.role, 'clients.write')
+  const bonusOk = can(me?.role, 'bonus')
+  const row = rows.find(r => r.phone === c.phone)
+  const acc = accounts.find(a => a.phone === c.phone)
+  const refBy = row?.refBy ? rows.find(r => r.phone === row.refBy) : undefined
+  const friends = rows.filter(r => r.refBy === c.phone)
+  const [npw, setNpw] = useState('')
   const [tab, setTab] = useState<'visits' | 'bonus' | 'profile'>('visits')
   const [p, setP] = useState({ name: c.name, note: c.note, tags: c.tags.join(', '), birthday: c.birthday ?? '', blocked: c.blocked })
   const [amt, setAmt] = useState(0), [sign, setSign] = useState<1 | -1>(1), [note, setNote] = useState('')
@@ -96,7 +105,7 @@ function Body({ c }: { c: Client }) {
             <div className="font-display text-[34px] leading-none mt-2 num" style={{ color: 'var(--gold)' }}>{num(c.balance)}</div>
             <div className="text-[12.5px] mt-1.5" style={{ color: 'var(--muted)' }}>1 бонус = 1 ₸ · можно оплатить до {S.loyalty.maxRedeemPct}% брони</div>
           </div>
-          <div className="rounded-2xl p-4 flex flex-col gap-3 border hairline">
+          {bonusOk && <div className="rounded-2xl p-4 flex flex-col gap-3 border hairline">
             <div className="font-medium text-[14.5px]">Начислить или списать вручную</div>
             <div className="grid grid-cols-[auto_1fr] gap-2">
               <div className="flex rounded-[14px] p-1 gap-1" style={{ background: 'var(--card-2)' }}>
@@ -108,7 +117,7 @@ function Body({ c }: { c: Client }) {
             <div className="flex flex-wrap gap-1.5">{[500, 1000, 2000, 5000].map(v => <button key={v} className="chip" onClick={() => setAmt(v)}>{num(v)}</button>)}</div>
             <input className="field" placeholder="Комментарий: подарок на день рождения, компенсация…" value={note} onChange={e => setNote(e.target.value)} />
             <button className="btn btn-primary h-11" disabled={busy || !amt} onClick={adjust}><Gift className="size-4" />{sign > 0 ? 'Начислить' : 'Списать'}{amt ? ` ${num(amt)}` : ''}</button>
-          </div>
+          </div>}
           <div className="flex flex-col">
             {ledger.length ? ledger.map(t => (
               <div key={t.id} className="flex items-center gap-3 py-2.5 border-b hairline last:border-0">
@@ -121,6 +130,18 @@ function Body({ c }: { c: Client }) {
         </>}
 
         {tab === 'profile' && <>
+          <div className="rounded-2xl p-4 flex flex-col gap-3 border hairline">
+            <div className="flex items-center gap-2 font-medium text-[14.5px]"><UserRound className="size-4" />Личный кабинет в виджете
+              <span className="ml-auto pill" style={acc ? (acc.verified ? { color: 'var(--good)', background: 'color-mix(in oklab, var(--good) 14%, transparent)' } : { color: 'var(--gold)', background: 'var(--gold-soft)' }) : { color: 'var(--muted)', background: 'var(--card-2)' }}>{acc ? (acc.verified ? 'подтверждён' : 'ждёт подтверждения') : 'не создан'}</span></div>
+            {!acc && <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>Клиент может зарегистрироваться в виджете по номеру телефона и паролю.</div>}
+            {acc && !acc.verified && <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>Бонусы и история откроются после первой оплаченной брони из кабинета, или подтвердите вручную, если уверены, что номер принадлежит клиенту.</div>}
+            {acc && writable && <div className="flex flex-wrap gap-2">
+              <button className="btn btn-line btn-sm" disabled={busy} onClick={async () => { setBusy(true); try { await verifyAccount(c.phone, !acc.verified); toast(acc.verified ? 'Подтверждение снято' : 'Кабинет подтверждён') } catch (e) { fail(e) } finally { setBusy(false) } }}><BadgeCheck className="size-4" />{acc.verified ? 'Снять подтверждение' : 'Подтвердить'}</button>
+            </div>}
+            {acc && writable && <div className="flex gap-2"><input className="field !h-10 num" placeholder="Новый пароль клиента" value={npw} onChange={e => setNpw(e.target.value)} /><button className="btn btn-line btn-sm shrink-0 !h-10" disabled={busy || npw.length < 6} onClick={async () => { setBusy(true); try { await resetClientPassword(c.phone, npw); try { await navigator.clipboard.writeText(npw) } catch { /* no clipboard */ } toast('Пароль клиента изменён и скопирован'); setNpw('') } catch (e) { fail(e) } finally { setBusy(false) } }}><KeyRound className="size-4" />Сменить</button></div>}
+            {row?.refCode && <div className="flex items-center gap-2 text-[13px] rounded-xl p-2.5" style={{ background: 'var(--card-2)' }}><Link2 className="size-4 shrink-0" style={{ color: 'var(--accent)' }} /><span className="flex-1 min-w-0 truncate">Код <b className="num">{row.refCode}</b> · пригласил {friends.length}</span><button className="icon-btn !size-8" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(refUrl(row.refCode!)); toast('Реферальная ссылка скопирована') } catch { toast(refUrl(row.refCode!), 'info') } }}><Copy className="size-3.5" /></button></div>}
+            {row?.refBy && <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>Пришёл(а) по приглашению {refBy ? refBy.name || fmtPhone(refBy.phone) : fmtPhone(row.refBy)}</div>}
+          </div>
           <Field label="Имя"><input className="field" value={p.name} onChange={e => setP({ ...p, name: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="День рождения"><div className="relative"><Cake className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--muted)' }} /><input type="date" className="field !pl-10" value={p.birthday} onChange={e => setP({ ...p, birthday: e.target.value })} /></div></Field>
@@ -131,7 +152,7 @@ function Body({ c }: { c: Client }) {
             <span className="flex items-center gap-2.5 text-[14px]"><Ban className="size-4" style={{ color: 'var(--bad)' }} />Чёрный список<span className="text-[12px]" style={{ color: 'var(--muted)' }}>виджет не примет бронь</span></span>
             <Switch on={p.blocked} onChange={v => setP({ ...p, blocked: v })} />
           </div>
-          <button className="btn btn-primary h-11" disabled={busy} onClick={saveProfile}><Save className="size-4" />Сохранить</button>
+          <button className="btn btn-primary h-11" disabled={busy || !writable} onClick={saveProfile}><Save className="size-4" />Сохранить</button>
           {c.firstAt && <div className="text-[12px] text-center" style={{ color: 'var(--faint)' }}>Клиент с {dShort(c.firstAt)}</div>}
         </>}
       </div>

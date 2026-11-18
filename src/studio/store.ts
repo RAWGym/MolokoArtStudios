@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { sb, fromRow, toRow, clientFromRow, txFromRow, staffFromRow, auditFromRow, selectAll, staffFn, loginEmail, ApiError, errCode } from '../lib/supabase'
-import { mergeSettings, DEFAULT_SETTINGS, hallById } from '../lib/catalog'
-import type { Booking, BonusTx, ClientRow, Settings, Staff, AuditRow } from '../lib/types'
+import { sb, fromRow, toRow, clientFromRow, txFromRow, staffFromRow, auditFromRow, moneyFromRow, certFromRow, requestFromRow, selectAll, staffFn, clientFn, loginEmail, ApiError, errCode } from '../lib/supabase'
+import { mergeSettings, DEFAULT_SETTINGS, hallById, applyCatalog } from '../lib/catalog'
+import type { Booking, BonusTx, ClientRow, Settings, Staff, AuditRow, MoneyRow, Cert, RequestRow, Role } from '../lib/types'
+import { can } from './perm'
 import { dShort, pad, normPhone } from '../lib/format'
 import { toast } from '../ui/kit'
 
@@ -18,7 +19,12 @@ interface State {
   tx: BonusTx[]
   staff: Staff[]
   audit: AuditRow[]
+  money: MoneyRow[]
+  certs: Cert[]
+  requests: RequestRow[]
+  accounts: { userId: string; phone: string; verified: boolean }[]
   S: Settings
+  refreshing: boolean
   init(): Promise<void>
   setup(name: string, login: string, pw: string): Promise<void>
   login(login: string, pw: string): Promise<void>
@@ -31,9 +37,20 @@ interface State {
   addBonus(phone: string, amount: number, note: string): Promise<void>
   saveSettings(S: Settings): Promise<void>
   loadAudit(): Promise<void>
-  staffCreate(p: { login: string; name: string; password: string; role: 'owner' | 'admin' }): Promise<void>
+  staffCreate(p: { login: string; name: string; password: string; role: Role }): Promise<void>
   staffDisable(userId: string, disabled: boolean): Promise<void>
   staffPassword(userId: string, password: string): Promise<void>
+  staffRole(userId: string, role: Role): Promise<void>
+  addMoney(m: Partial<MoneyRow>): Promise<void>
+  updateMoney(id: string, m: Partial<MoneyRow>): Promise<void>
+  deleteMoney(id: string): Promise<void>
+  saveCert(c: Partial<Cert> & { id?: string }): Promise<Cert>
+  deleteCert(id: string): Promise<void>
+  request(r: { bookingId: string | null; kind: RequestRow['kind']; note: string; payload?: Record<string, unknown> }): Promise<void>
+  decide(id: string, approve: boolean, answer?: string): Promise<void>
+  verifyAccount(phone: string, verified: boolean): Promise<void>
+  resetClientPassword(phone: string, password: string): Promise<void>
+  refresh(): Promise<void>
   seedDemo(): Promise<number>
   clearDemo(): Promise<number>
 }
@@ -43,7 +60,7 @@ const sortB = (a: Booking[]) => a.sort((x, y) => x.date === y.date ? x.start - y
 
 export const useStudio = create<State>((set, get) => ({
   phase: 'boot', me: null, live: 'connecting', loaded: false,
-  bookings: [], clients: [], tx: [], staff: [], audit: [], S: DEFAULT_SETTINGS,
+  bookings: [], clients: [], tx: [], staff: [], audit: [], money: [], certs: [], requests: [], accounts: [], S: DEFAULT_SETTINGS, refreshing: false,
 
   async init() {
     const { data: { session } } = await sb.auth.getSession()
@@ -73,25 +90,38 @@ export const useStudio = create<State>((set, get) => ({
   async logout() {
     channel?.unsubscribe(); channel = null
     await sb.auth.signOut()
-    set({ me: null, phase: 'login', bookings: [], clients: [], tx: [], staff: [], audit: [], loaded: false })
+    set({ me: null, phase: 'login', bookings: [], clients: [], tx: [], staff: [], audit: [], money: [], certs: [], requests: [], accounts: [], loaded: false })
   },
 
   async loadAll() {
+    const role = get().me?.role
+    const opt = <T,>(ok: boolean, p: () => Promise<T[]>) => ok ? p().catch(() => [] as T[]) : Promise.resolve([] as T[])
     try {
-      const [bookings, clients, tx, staff, st] = await Promise.all([
+      const [bookings, clients, tx, staff, st, money, certs, requests, accounts] = await Promise.all([
         selectAll('moloko_bookings', fromRow),
         selectAll('moloko_clients', clientFromRow),
         selectAll('moloko_bonus_tx', txFromRow),
         selectAll('moloko_staff', staffFromRow),
         sb.from('moloko_settings').select('data').eq('id', 1).maybeSingle(),
+        opt(can(role, 'money'), () => selectAll('moloko_money', moneyFromRow)),
+        opt(can(role, 'certs'), () => selectAll('moloko_certs', certFromRow)),
+        opt(true, () => selectAll('moloko_requests', requestFromRow)),
+        opt(true, () => selectAll('moloko_accounts', (r: any) => ({ userId: r.user_id, phone: r.phone, verified: r.verified }))),
       ])
-      set({ bookings: sortB(bookings), clients, tx, staff, S: mergeSettings(st.data?.data), loaded: true })
+      const S = mergeSettings(st.data?.data); applyCatalog(S)
+      set({ bookings: sortB(bookings), clients, tx, staff, S, money, certs, requests, accounts, loaded: true })
     } catch (e) {
       set({ loaded: true, live: 'offline' })
       toast('Не удалось загрузить данные. Проверьте интернет.', 'err')
       return
     }
-    subscribe(set, get)
+    if (!channel) subscribe(set, get)
+  },
+
+  async refresh() {
+    if (get().refreshing) return
+    set({ refreshing: true })
+    try { await get().loadAll() } finally { set({ refreshing: false }) }
   },
 
   async createBooking(b) {
@@ -144,6 +174,7 @@ export const useStudio = create<State>((set, get) => ({
   },
 
   async saveSettings(S) {
+    applyCatalog(S)
     const { error } = await sb.from('moloko_settings').upsert({ id: 1, data: S, updated_by: get().me?.userId, updated_at: new Date().toISOString() })
     if (error) throw new ApiError(errCode(error))
     set({ S })
@@ -157,6 +188,63 @@ export const useStudio = create<State>((set, get) => ({
   async staffCreate(p) { await staffFn({ action: 'create', ...p }); await reloadStaff(set) },
   async staffDisable(userId, disabled) { await staffFn({ action: 'set_disabled', user_id: userId, disabled }); await reloadStaff(set) },
   async staffPassword(userId, password) { await staffFn({ action: 'set_password', user_id: userId, password }) },
+  async staffRole(userId, role) { await staffFn({ action: 'set_role', user_id: userId, role }); await reloadStaff(set) },
+
+  async addMoney(m) {
+    const { data, error } = await sb.from('moloko_money').insert({ date: m.date, kind: m.kind, category: m.category, amount: m.amount, method: m.method, note: m.note ?? '', booking_id: m.bookingId ?? null, cert_id: m.certId ?? null }).select().single()
+    if (error) throw new ApiError(errCode(error))
+    const r = moneyFromRow(data); set({ money: [...get().money.filter(x => x.id !== r.id), r] })
+  },
+  async updateMoney(id, m) {
+    const row: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(m)) if (v !== undefined) row[{ bookingId: 'booking_id', certId: 'cert_id' }[k] ?? k] = v
+    const { data, error } = await sb.from('moloko_money').update(row).eq('id', id).select().single()
+    if (error) throw new ApiError(errCode(error))
+    const r = moneyFromRow(data); set({ money: get().money.map(x => x.id === id ? r : x) })
+  },
+  async deleteMoney(id) {
+    const prev = get().money; set({ money: prev.filter(x => x.id !== id) })
+    const { error } = await sb.from('moloko_money').delete().eq('id', id)
+    if (error) { set({ money: prev }); throw new ApiError(errCode(error)) }
+  },
+  async saveCert(c) {
+    const row = { code: c.code, kind: c.kind, title: c.title ?? '', phone: c.phone ?? '', name: c.name ?? '', amount: c.amount ?? 0, hours: c.hours ?? 0, price: c.price ?? 0, uses: c.uses ?? [], status: c.status ?? 'active', expires: c.expires || null, note: c.note ?? '' }
+    const q = c.id ? sb.from('moloko_certs').update(row).eq('id', c.id) : sb.from('moloko_certs').insert(row)
+    const { data, error } = await q.select().single()
+    if (error) throw new ApiError(/duplicate|unique/i.test(error.message) ? 'code_taken' : errCode(error))
+    const r = certFromRow(data); set({ certs: [...get().certs.filter(x => x.id !== r.id), r] })
+    return r
+  },
+  async deleteCert(id) {
+    const { error } = await sb.from('moloko_certs').delete().eq('id', id)
+    if (error) throw new ApiError(errCode(error))
+    set({ certs: get().certs.filter(x => x.id !== id) })
+  },
+  async request(r) {
+    const { data, error } = await sb.from('moloko_requests').insert({ booking_id: r.bookingId, kind: r.kind, note: r.note, payload: r.payload ?? {}, created_by: get().me?.userId }).select().single()
+    if (error) throw new ApiError(errCode(error))
+    const x = requestFromRow(data); set({ requests: [x, ...get().requests.filter(y => y.id !== x.id)] })
+  },
+  async decide(id, approve, answer = '') {
+    const r = get().requests.find(x => x.id === id); if (!r) return
+    if (approve && r.bookingId) {
+      const b = get().bookings.find(x => x.id === r.bookingId)
+      if (b) {
+        if (r.kind === 'delete') await get().deleteBooking(b.id)
+        else if (r.kind === 'cancel') await get().updateBooking(b.id, { status: 'cancelled', penalty: Number(r.payload.penalty ?? 0), reason: String(r.payload.reason ?? r.note), cancelledAt: new Date().toISOString(), cancelledBy: r.createdBy })
+        else if (r.kind === 'edit' && r.payload.patch) await get().updateBooking(b.id, r.payload.patch as Partial<Booking>)
+      }
+    }
+    const { data, error } = await sb.from('moloko_requests').update({ status: approve ? 'approved' : 'rejected', decided_at: new Date().toISOString(), decided_by: get().me?.userId, answer }).eq('id', id).select().single()
+    if (error) throw new ApiError(errCode(error))
+    const x = requestFromRow(data); set({ requests: get().requests.map(y => y.id === id ? x : y) })
+  },
+  async verifyAccount(phone, verified) {
+    const { error } = await sb.from('moloko_accounts').update({ verified }).eq('phone', phone)
+    if (error) throw new ApiError(errCode(error))
+    set({ accounts: get().accounts.map(a => a.phone === phone ? { ...a, verified } : a) })
+  },
+  async resetClientPassword(phone, password) { await clientFn({ action: 'reset_password', phone, password }) },
 
   async seedDemo() {
     const names: [string, string][] = [['Айгерим Сейткали', '+7 701 214 55 10'], ['Никита Ш. · фотограф', '+7 705 330 19 42'], ['Карина Р. · фотограф', '+7 707 500 77 13'], ['Дана Есенова', '+7 777 880 12 64'], ['Бренд Saule', '+7 701 912 33 08'], ['Арман и Жания', '+7 702 640 80 21'], ['Мадияр К.', '+7 776 105 22 90']]
@@ -236,7 +324,24 @@ function subscribe(set: (p: Partial<State>) => void, get: () => State) {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moloko_bonus_tx' }, (p: any) => {
       const t = txFromRow(p.new); set({ tx: [...get().tx.filter(x => x.id !== t.id), t] })
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_settings' }, (p: any) => { if (p.new?.data) set({ S: mergeSettings(p.new.data) }) })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_settings' }, (p: any) => { if (p.new?.data) { const S = mergeSettings(p.new.data); applyCatalog(S); set({ S }) } })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_requests' }, (p: any) => {
+      const cur = get().requests
+      if (p.eventType === 'DELETE') { set({ requests: cur.filter(r => r.id !== p.old.id) }); return }
+      const r = requestFromRow(p.new); const isNew = !cur.some(x => x.id === r.id)
+      set({ requests: [r, ...cur.filter(x => x.id !== r.id)] })
+      if (isNew && get().me?.role === 'owner' && r.createdBy !== get().me?.userId) toast('Новый запрос на подтверждение', 'info')
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_money' }, (p: any) => {
+      const cur = get().money
+      if (p.eventType === 'DELETE') { set({ money: cur.filter(r => r.id !== p.old.id) }); return }
+      const r = moneyFromRow(p.new); set({ money: [...cur.filter(x => x.id !== r.id), r] })
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_certs' }, (p: any) => {
+      const cur = get().certs
+      if (p.eventType === 'DELETE') { set({ certs: cur.filter(r => r.id !== p.old.id) }); return }
+      const r = certFromRow(p.new); set({ certs: [...cur.filter(x => x.id !== r.id), r] })
+    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_staff' }, () => reloadStaff(set))
     .subscribe(status => {
       if (status === 'SUBSCRIBED') set({ live: 'live' })

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Check, Lock, CalendarPlus, Gift, Pencil } from 'lucide-react'
+import { AlertTriangle, Check, Lock, CalendarPlus, Gift, Pencil, Plus, X, Layers } from 'lucide-react'
 import { useStudio } from './store'
 import { useUI } from './ui'
 import { useClients, clash, levelTone } from './derive'
-import { HALLS, EQUIP, KINDS, SOURCES, PAY_METHODS, quote, hallById } from '../lib/catalog'
+import { HALLS, EQUIP, KINDS, SOURCES, PAY_METHODS, quote, hallById, noConfetti } from '../lib/catalog'
 import { Sheet, Segmented, Stepper, Switch, Field, cx, toast } from '../ui/kit'
 import { money, maskPhone, normPhone, fmtPhone, today, pad, num, timeRange, dShort } from '../lib/format'
 import { fail } from './msg'
+import { can } from './perm'
 import type { Booking, Status } from '../lib/types'
 
 type F = {
@@ -18,6 +19,8 @@ type F = {
   source: string; comment: string; status: Status; payMethod: string
   bonusUsed: number; manual: boolean; total: number
 }
+
+type Seg = { key: number; hall: string; date: string; start: number; hours: number }
 
 const blank = (): F => {
   const h = new Date().getHours() + 1
@@ -36,7 +39,8 @@ export function BookingForm() {
 }
 
 function Body({ edit }: { edit?: Booking }) {
-  const { S, bookings, createBooking, updateBooking } = useStudio()
+  const { S, bookings, createBooking, updateBooking, me } = useStudio()
+  const canBook = can(me?.role, 'book')
   const { form, closeForm, openBooking } = useUI()
   const clients = useClients()
   const [f, setF] = useState<F>(() => {
@@ -44,7 +48,7 @@ function Body({ edit }: { edit?: Booking }) {
     const src: Partial<Booking> & { mode?: 'booking' | 'block' } = edit ?? form.prefill
     const out: F = { ...base }
     for (const k of Object.keys(base) as (keyof F)[]) if (src[k as string] !== undefined && src[k as string] !== null) (out as any)[k] = src[k as string]
-    if (edit?.status === 'block' || form.prefill.mode === 'block') out.mode = 'block'
+    if (edit?.status === 'block' || form.prefill.mode === 'block' || !canBook) out.mode = 'block'
     if (src.phone) out.phone = maskPhone(src.phone)
     if (edit) out.manual = edit.total !== quote(edit, S).total
     return out
@@ -53,6 +57,19 @@ function Body({ edit }: { edit?: Booking }) {
   const [busy, setBusy] = useState(false)
   const [suggest, setSuggest] = useState(false)
   const block = f.mode === 'block'
+  const [more, setMore] = useState<Seg[]>([])
+  const combo = !edit && !block && more.length > 0
+  const segQ = more.map(s => quote({ hall: s.hall, start: s.start, hours: s.hours, guests: 1, equip: [], confetti: false, makeup: false }, S).total)
+  const segClash = more.map((s, i) => {
+    const hit = clash(bookings, s.hall, s.date, s.start, s.hours)
+    if (hit) return hit.status === 'block' ? 'зал закрыт' : `занято: ${hit.name}`
+    const all = [{ hall: f.hall, date: f.date, start: f.start, hours: f.hours }, ...more.slice(0, i)]
+    const t0 = new Date(s.date + 'T00:00').getTime() + s.start * 36e5, t1 = t0 + s.hours * 36e5
+    return all.some(o => { const o0 = new Date(o.date + 'T00:00').getTime() + o.start * 36e5; return o.hall === s.hall && o0 < t1 && o0 + o.hours * 36e5 > t0 }) ? 'пересекается с этой же бронью' : null
+  })
+  const comboTotal = f.total + segQ.reduce((a, b) => a + b, 0)
+  const addSeg = () => setMore(m => { const last = m[m.length - 1] ?? f; const free = HALLS.find(h => h.id !== last.hall) ?? HALLS[0]; return [...m, { key: Date.now(), hall: free.id, date: last.date, start: Math.min(23, last.start + last.hours), hours: 1 }] })
+  const setSeg = (key: number, p: Partial<Seg>) => setMore(m => m.map(x => x.key === key ? { ...x, ...p } : x))
 
   const q = useMemo(() => quote({ hall: f.hall, start: f.start, hours: f.hours, guests: f.guests, equip: f.equip, confetti: f.confetti, makeup: f.makeup }, S), [f.hall, f.start, f.hours, f.guests, f.equip, f.confetti, f.makeup, S])
   useEffect(() => { if (!f.manual) set('total', q.total) }, [q.total, f.manual]) // eslint-disable-line
@@ -73,7 +90,8 @@ function Body({ edit }: { edit?: Booking }) {
   const submit = async () => {
     if (!valid) { toast(f.name.trim().length < 2 ? 'Укажите имя клиента' : 'Проверьте номер телефона', 'err'); return }
     if (conflict) { toast('Это время уже занято', 'err'); return }
-    if (!block && f.hall === 'grey' && f.confetti) { toast('В зале GREY конфетти запрещено', 'err'); return }
+    if (!block && noConfetti(f.hall) && f.confetti) { toast(`В зале ${hallById(f.hall).name} конфетти запрещено`, 'err'); return }
+    if (combo && segClash.some(Boolean)) { toast('Один из залов комбо-брони занят', 'err'); return }
     setBusy(true)
     const payload: Partial<Booking> = block
       ? { hall: f.hall, date: f.date, start: f.start, hours: f.hours, status: 'block', name: 'Блокировка', phone: '', total: 0, comment: f.comment, source: 'CRM' }
@@ -81,17 +99,22 @@ function Body({ edit }: { edit?: Booking }) {
     if (!block && !edit) { payload.status = f.status; if (f.status === 'paid') { payload.payMethod = f.payMethod; payload.paidAt = new Date().toISOString() } }
     try {
       if (edit) { await updateBooking(edit.id, payload); toast('Изменения сохранены'); closeForm(); openBooking(edit.id) }
-      else { const id = await createBooking(payload); toast(block ? 'Зал закрыт на это время' : 'Бронь создана', 'ok', block ? undefined : { label: 'Открыть', run: () => openBooking(id) }); closeForm() }
+      else {
+        if (combo) payload.groupId = crypto.randomUUID()
+        const id = await createBooking(payload)
+        if (combo) for (const [i, sg] of more.entries()) await createBooking({ ...payload, hall: sg.hall, date: sg.date, start: sg.start, hours: sg.hours, total: segQ[i], bonusUsed: 0, equip: [], makeup: false, confetti: false, comment: [payload.comment, 'Комбо-бронь'].filter(Boolean).join(' · ') })
+        toast(block ? 'Зал закрыт на это время' : combo ? `Комбо-бронь создана · ${more.length + 1} зала` : 'Бронь создана', 'ok', block ? undefined : { label: 'Открыть', run: () => openBooking(id) }); closeForm()
+      }
     } catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   const hours = Array.from({ length: 24 }, (_, h) => h)
   return (
     <div className="flex flex-col gap-5 pt-1">
-      {!edit && <Segmented value={f.mode} onChange={v => set('mode', v)} items={[['booking', <span className="flex items-center gap-1.5"><CalendarPlus className="size-3.5" />Бронь</span>], ['block', <span className="flex items-center gap-1.5"><Lock className="size-3.5" />Закрыть зал</span>]]} className="self-start" />}
+      {!edit && canBook && <Segmented value={f.mode} onChange={v => set('mode', v)} items={[['booking', <span className="flex items-center gap-1.5"><CalendarPlus className="size-3.5" />Бронь</span>], ['block', <span className="flex items-center gap-1.5"><Lock className="size-3.5" />Закрыть зал</span>]]} className="self-start" />}
 
       {/* hall */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
         {HALLS.map(h => (
           <button key={h.id} type="button" onClick={() => set('hall', h.id)} className={cx('relative h-[72px] rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97]', f.hall === h.id ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg)]' : 'opacity-75 hover:opacity-100')}>
             <img src={h.img} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -119,6 +142,26 @@ function Body({ edit }: { edit?: Booking }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!edit && !block && (
+        <div className="flex flex-col gap-2 -mt-1">
+          <AnimatePresence initial={false}>
+            {more.map((sg, i) => (
+              <motion.div key={sg.key} layout initial={{ opacity: 0, y: -8, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, height: 0, marginTop: -8 }} className="rounded-2xl p-3 border hairline" style={{ background: 'var(--card-2)' }}>
+                <div className="flex items-center gap-2 mb-2 text-[12.5px]" style={{ color: 'var(--muted)' }}><Layers className="size-3.5" />Зал {i + 2}<span className="ml-auto num">{money(segQ[i])}</span><button type="button" className="icon-btn !size-7" aria-label="Убрать" onClick={() => setMore(m => m.filter(x => x.key !== sg.key))}><X className="size-3.5" /></button></div>
+                <div className="grid grid-cols-2 sm:grid-cols-[1fr_1.2fr_.9fr_auto] gap-2 items-center">
+                  <select className="field !h-11" value={sg.hall} onChange={e => setSeg(sg.key, { hall: e.target.value })}>{HALLS.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}</select>
+                  <input type="date" className="field !h-11" value={sg.date} onChange={e => e.target.value && setSeg(sg.key, { date: e.target.value })} />
+                  <select className="field !h-11" value={sg.start} onChange={e => setSeg(sg.key, { start: +e.target.value })}>{hours.map(h => <option key={h} value={h}>{pad(h)}:00</option>)}</select>
+                  <Stepper value={sg.hours} onChange={v => setSeg(sg.key, { hours: v })} min={1} max={12} />
+                </div>
+                <div className="text-[12.5px] mt-2 flex items-center gap-1.5" style={{ color: segClash[i] ? 'var(--bad)' : 'var(--good)' }}>{segClash[i] ? <><AlertTriangle className="size-3.5" />{segClash[i]}</> : <><Check className="size-3.5" />{timeRange(sg.start, sg.hours)} свободно</>}</div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {more.length < 5 && <button type="button" className="self-start text-[13px] flex items-center gap-1.5 font-medium" style={{ color: 'var(--accent)' }} onClick={addSeg}><Plus className="size-4" />{more.length ? 'Ещё зал' : 'Комбо: добавить другой зал или время'}</button>}
+        </div>
+      )}
 
       {block ? (
         <Field label="Причина"><textarea className="field" rows={2} value={f.comment} onChange={e => set('comment', e.target.value)} placeholder="Уборка, ремонт, своя съёмка…" /></Field>
@@ -155,7 +198,7 @@ function Body({ edit }: { edit?: Booking }) {
         <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
           <div className="flex items-center justify-between gap-3"><span className="text-[14px]">Гостей <span style={{ color: 'var(--muted)' }}>· до {S.freeGuests} бесплатно</span></span><Stepper value={f.guests} onChange={v => set('guests', v)} min={1} max={40} /></div>
           <Toggle label="Гримёрка за час" on={f.makeup} set={v => set('makeup', v)} />
-          <Toggle label={f.hall === 'grey' ? 'Конфетти (нельзя в GREY)' : 'Конфетти'} on={f.confetti} set={v => set('confetti', v)} disabled={f.hall === 'grey'} />
+          <Toggle label={noConfetti(f.hall) ? `Конфетти (нельзя в ${hallById(f.hall).name})` : 'Конфетти'} on={f.confetti} set={v => set('confetti', v)} disabled={noConfetti(f.hall)} />
           <Toggle label="С питомцем" on={f.pet} set={v => set('pet', v)} />
         </div>
 
@@ -192,13 +235,14 @@ function Body({ edit }: { edit?: Booking }) {
               <Switch on={f.bonusUsed > 0} onChange={v => set('bonusUsed', v ? maxBonus : 0)} />
             </div>
           )}
-          {f.bonusUsed > 0 && <div className="flex justify-between font-semibold"><span>К оплате</span><span className="num">{money(f.total - f.bonusUsed)}</span></div>}
+          {combo && <div className="flex justify-between gap-3 text-[13.5px]" style={{ color: 'var(--ink-2)' }}><span>Ещё {more.length} {more.length === 1 ? 'зал' : 'зала'} по прайсу</span><span className="num">{money(comboTotal - f.total)}</span></div>}
+          {(f.bonusUsed > 0 || combo) && <div className="flex justify-between font-semibold"><span>К оплате{combo ? ' за всё' : ''}</span><span className="num">{money(comboTotal - f.bonusUsed)}</span></div>}
         </div>
       </>}
 
       <div className="sticky bottom-0 -mx-5 md:-mx-7 px-5 md:px-7 pt-3 pb-1 flex gap-2" style={{ background: 'linear-gradient(transparent, var(--panel, var(--bg)) 30%)' }}>
         <button type="button" className="btn btn-line h-12 flex-1" onClick={closeForm}>Отмена</button>
-        <button type="button" className="btn btn-primary h-12 flex-[2]" disabled={busy || !!conflict || !valid} onClick={submit}>{busy ? 'Сохраняем…' : edit ? 'Сохранить' : block ? 'Закрыть зал' : `Создать · ${money(f.total - f.bonusUsed)}`}</button>
+        <button type="button" className="btn btn-primary h-12 flex-[2]" disabled={busy || !!conflict || !valid || (combo && segClash.some(Boolean))} onClick={submit}>{busy ? 'Сохраняем…' : edit ? 'Сохранить' : block ? 'Закрыть зал' : `Создать · ${money(comboTotal - f.bonusUsed)}`}</button>
       </div>
     </div>
   )
