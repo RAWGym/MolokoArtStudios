@@ -15,10 +15,30 @@ export const MON = ['января', 'февраля', 'марта', 'апрел�
 export const MON_S = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 export const MON_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
+/* language for the client widget (CRM stays Russian): the arrays above are swapped in place */
+export type Lang = 'ru' | 'kk'
+let LANG: Lang = 'ru'
+const RU = { DOW: [...DOW], DOW_FULL: [...DOW_FULL], MON: [...MON], MON_S: [...MON_S], MON_NOM: [...MON_NOM] }
+const KK = {
+  DOW: ['жс', 'дс', 'сс', 'ср', 'бс', 'жм', 'сб'],
+  DOW_FULL: ['жексенбі', 'дүйсенбі', 'сейсенбі', 'сәрсенбі', 'бейсенбі', 'жұма', 'сенбі'],
+  MON: ['қаңтар', 'ақпан', 'наурыз', 'сәуір', 'мамыр', 'маусым', 'шілде', 'тамыз', 'қыркүйек', 'қазан', 'қараша', 'желтоқсан'],
+  MON_S: ['қаң', 'ақп', 'нау', 'сәу', 'мам', 'мау', 'шіл', 'там', 'қыр', 'қаз', 'қар', 'жел'],
+  MON_NOM: ['Қаңтар', 'Ақпан', 'Наурыз', 'Сәуір', 'Мамыр', 'Маусым', 'Шілде', 'Тамыз', 'Қыркүйек', 'Қазан', 'Қараша', 'Желтоқсан'],
+}
+export const fmtLang = () => LANG
+export function setFmtLang(l: Lang) {
+  LANG = l
+  const src = l === 'kk' ? KK : RU
+  DOW.splice(0, 7, ...src.DOW); DOW_FULL.splice(0, 7, ...src.DOW_FULL)
+  MON.splice(0, 12, ...src.MON); MON_S.splice(0, 12, ...src.MON_S); MON_NOM.splice(0, 12, ...src.MON_NOM)
+}
+
 export function dLabel(s: string, withDow = true) {
   const d = parseYmd(s)
   const t = today(), tm = ymd(addDays(new Date(), 1)), ye = ymd(addDays(new Date(), -1))
-  const head = s === t ? 'Сегодня' : s === tm ? 'Завтра' : s === ye ? 'Вчера' : withDow ? cap(DOW_FULL[d.getDay()]) : ''
+  const kk = LANG === 'kk'
+  const head = s === t ? (kk ? 'Бүгін' : 'Сегодня') : s === tm ? (kk ? 'Ертең' : 'Завтра') : s === ye ? (kk ? 'Кеше' : 'Вчера') : withDow ? cap(DOW_FULL[d.getDay()]) : ''
   return (head ? head + ', ' : '') + d.getDate() + ' ' + MON[d.getMonth()]
 }
 export const dShort = (s: string) => { const d = parseYmd(s); return `${d.getDate()} ${MON_S[d.getMonth()]}` }
@@ -28,13 +48,14 @@ export const plural = (n: number, one: string, few: string, many: string) => {
   const a = Math.abs(n) % 100, b = a % 10
   return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many
 }
-export const hoursLabel = (n: number) => `${n} ${plural(n, 'час', 'часа', 'часов')}`
+export const hoursLabel = (n: number) => LANG === 'kk' ? `${n} сағат` : `${n} ${plural(n, 'час', 'часа', 'часов')}`
 
 export function relTime(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
-  if (s < 60) return 'только что'
-  if (s < 3600) return `${Math.floor(s / 60)} мин назад`
-  if (s < 86400) return `${Math.floor(s / 3600)} ч назад`
+  const kk = LANG === 'kk'
+  if (s < 60) return kk ? 'жаңа ғана' : 'только что'
+  if (s < 3600) return `${Math.floor(s / 60)} ${kk ? 'мин бұрын' : 'мин назад'}`
+  if (s < 86400) return `${Math.floor(s / 3600)} ${kk ? 'сағ бұрын' : 'ч назад'}`
   const d = new Date(iso)
   return `${d.getDate()} ${MON_S[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

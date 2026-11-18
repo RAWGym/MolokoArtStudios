@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Booking } from '../lib/types'
 import { store } from '../lib/format'
 
-export type Page = 'overview' | 'schedule' | 'pipeline' | 'clients' | 'finance' | 'analytics' | 'loyalty' | 'widget' | 'messages' | 'prices' | 'team' | 'requests' | 'journal' | 'notify'
+export type Page = 'overview' | 'schedule' | 'pipeline' | 'clients' | 'finance' | 'analytics' | 'loyalty' | 'widget' | 'messages' | 'prices' | 'team' | 'requests' | 'journal' | 'notify' | 'settings'
 export const OWNER_PAGES: Page[] = ['finance', 'analytics', 'loyalty', 'widget', 'messages', 'prices', 'team', 'requests', 'journal']
 
 export type FormPrefill = Partial<Booking> & { mode?: 'booking' | 'block' }

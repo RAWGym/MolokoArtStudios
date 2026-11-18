@@ -29,6 +29,7 @@
         try { t = localStorage.getItem('moloko.theme') || 'dark' } catch (e) {}
         if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         d.dataset.theme = t;
+        try { d.dataset.skin = localStorage.getItem('moloko.skin') || 'moloko' } catch (e) { d.dataset.skin = 'moloko' }
         document.getElementById('manifest').href = '/manifest-studio.webmanifest';
         document.querySelector('link[rel="apple-touch-icon"]').href = '/icons/studio-512.png';
         document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#12100E' : '#EFE6D8';
