@@ -124,6 +124,14 @@
 }
 
 @layer base {
+  /* grid and flex children never push their track wider than the screen */
+  .grid > *, .flex > .flex-1 { min-width: 0; }
+  input, select, textarea { max-width: 100%; }
+  input[type=date], input[type=time] { -webkit-appearance: none; appearance: none; min-width: 0; display: block; }
+  input[type=date]::-webkit-date-and-time-value { text-align: left; }
+  input[type=date].field { padding-right: 10px; }
+  h1, h2, h3, p { overflow-wrap: anywhere; }
+
 html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); overflow-x: clip; }
 body { font-family: var(--font-sans); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-feature-settings: "ss01", "cv11"; }

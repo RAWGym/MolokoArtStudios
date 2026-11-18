@@ -56,11 +56,11 @@ export default function Ledger() {
           <button className="btn btn-primary h-10" onClick={() => setEdit({ kind: 'income', category: INCOME_CATS[3], date: today(), method: 'kaspi' })}><Plus className="size-4" />Доход</button>
         </>} />
 
-      <div className="grid grid-cols-3 gap-3 md:gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-4">
         {[['Пришло', inc, 'var(--good)'], ['Ушло', exp, 'var(--bad)'], ['Итого', inc - exp, inc - exp >= 0 ? 'var(--gold)' : 'var(--bad)']].map(([k, v, c], i) => (
-          <motion.div key={k as string} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * .05 }} className="glass p-4">
+          <motion.div key={k as string} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * .05 }} className="glass px-4 py-3 sm:p-4 flex sm:block items-center justify-between gap-3">
             <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>{k as string}</div>
-            <div className="font-display text-[clamp(16px,4.6vw,26px)] mt-1 num whitespace-nowrap" style={{ color: c as string }}>{money(v as number)}</div>
+            <div className="font-display text-[20px] sm:text-[clamp(18px,2vw,26px)] sm:mt-1 num whitespace-nowrap" style={{ color: c as string }}>{money(v as number)}</div>
           </motion.div>
         ))}
       </div>

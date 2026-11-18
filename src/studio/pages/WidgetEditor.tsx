@@ -89,10 +89,10 @@ export default function WidgetEditor() {
           <Card title="Опции и оборудование" action={owner && <button className="btn btn-line btn-sm" onClick={() => setEquip([...equip, { id: 'opt' + Date.now().toString(36), n: '', d: '', price: 1000 }])}><Plus className="size-4" />Опция</button>}>
             <div className="flex flex-col gap-2">
               {equip.map((e, i) => (
-                <div key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_auto] gap-2 items-center">
-                  <input className="field !h-11" value={e.n} placeholder="Название" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, n: x.target.value } : y))} />
+                <div key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_auto] gap-2 items-center rounded-2xl sm:rounded-none p-2 sm:p-0 bg-[var(--card-3)] sm:bg-transparent">
+                  <input className="field !h-11 col-span-2 sm:col-span-1" value={e.n} placeholder="Название" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, n: x.target.value } : y))} />
                   <input className="field !h-11 hidden sm:block" value={e.d ?? ''} placeholder="Пояснение" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, d: x.target.value } : y))} />
-                  <div className="relative"><input className="field !h-11 num pr-12 !w-[120px]" inputMode="numeric" disabled={!owner} value={e.price ? num(e.price) : ''} placeholder="0" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, price: +x.target.value.replace(/\D/g, '') || 0 } : y))} /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none" style={{ color: 'var(--muted)' }}>₸/ч</span></div>
+                  <div className="relative"><input className="field !h-11 num pr-12 sm:!w-[120px]" inputMode="numeric" disabled={!owner} value={e.price ? num(e.price) : ''} placeholder="0" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, price: +x.target.value.replace(/\D/g, '') || 0 } : y))} /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none" style={{ color: 'var(--muted)' }}>₸/ч</span></div>
                   {owner && <button className="icon-btn !size-10" onClick={() => setEquip(equip.filter((_, j) => j !== i))} aria-label="Удалить опцию"><Trash2 className="size-4" /></button>}
                 </div>
               ))}
