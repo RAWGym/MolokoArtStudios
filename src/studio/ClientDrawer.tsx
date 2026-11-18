@@ -28,8 +28,8 @@ function Body({ c }: { c: Client }) {
   const bonusOk = can(me?.role, 'bonus')
   const row = rows.find(r => r.phone === c.phone)
   const acc = accounts.find(a => a.phone === c.phone)
-  const refBy = row?.refBy ? rows.find(r => r.refCode === row.refBy) : undefined
-  const friends = row?.refCode ? rows.filter(r => r.refBy === row.refCode) : []
+  const refBy = row?.refBy ? rows.find(r => r.phone === row.refBy) : undefined
+  const friends = rows.filter(r => r.refBy === c.phone)
   const [npw, setNpw] = useState('')
   const [tab, setTab] = useState<'visits' | 'bonus' | 'profile'>('visits')
   const [p, setP] = useState({ name: c.name, note: c.note, tags: c.tags.join(', '), birthday: c.birthday ?? '', blocked: c.blocked })
@@ -140,7 +140,7 @@ function Body({ c }: { c: Client }) {
             </div>}
             {acc && writable && <div className="flex gap-2"><input className="field !h-10 num" placeholder="Новый пароль клиента" value={npw} onChange={e => setNpw(e.target.value)} /><button className="btn btn-line btn-sm shrink-0 !h-10" disabled={busy || npw.length < 6} onClick={async () => { setBusy(true); try { await resetClientPassword(c.phone, npw); try { await navigator.clipboard.writeText(npw) } catch { /* no clipboard */ } toast('Пароль клиента изменён и скопирован'); setNpw('') } catch (e) { fail(e) } finally { setBusy(false) } }}><KeyRound className="size-4" />Сменить</button></div>}
             {row?.refCode && <div className="flex items-center gap-2 text-[13px] rounded-xl p-2.5" style={{ background: 'var(--card-2)' }}><Link2 className="size-4 shrink-0" style={{ color: 'var(--accent)' }} /><span className="flex-1 min-w-0 truncate">Код <b className="num">{row.refCode}</b> · пригласил {friends.length}</span><button className="icon-btn !size-8" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(refUrl(row.refCode!)); toast('Реферальная ссылка скопирована') } catch { toast(refUrl(row.refCode!), 'info') } }}><Copy className="size-3.5" /></button></div>}
-            {row?.refBy && <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>Пришёл(а) по приглашению {refBy ? refBy.name || fmtPhone(refBy.phone) : row.refBy}</div>}
+            {row?.refBy && <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>Пришёл(а) по приглашению {refBy ? refBy.name || fmtPhone(refBy.phone) : fmtPhone(row.refBy)}</div>}
           </div>
           <Field label="Имя"><input className="field" value={p.name} onChange={e => setP({ ...p, name: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
