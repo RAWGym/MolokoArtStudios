@@ -12,11 +12,11 @@ export const ROLE_HINT: Record<Role, string> = {
 export const ROLES: Role[] = ['owner', 'admin', 'accountant', 'tech', 'smm']
 
 const PAGES: Record<Role, Page[]> = {
-  owner: ['overview', 'schedule', 'pipeline', 'clients', 'finance', 'analytics', 'loyalty', 'widget', 'messages', 'prices', 'team', 'requests', 'journal'],
-  admin: ['overview', 'schedule', 'pipeline', 'clients', 'requests'],
-  accountant: ['overview', 'schedule', 'pipeline', 'clients', 'finance', 'journal'],
-  tech: ['schedule'],
-  smm: ['schedule', 'widget', 'analytics'],
+  owner: ['overview', 'schedule', 'pipeline', 'clients', 'finance', 'analytics', 'loyalty', 'widget', 'messages', 'prices', 'team', 'requests', 'journal', 'notify'],
+  admin: ['overview', 'schedule', 'pipeline', 'clients', 'requests', 'notify'],
+  accountant: ['overview', 'schedule', 'pipeline', 'clients', 'finance', 'journal', 'notify'],
+  tech: ['schedule', 'notify'],
+  smm: ['schedule', 'widget', 'analytics', 'notify'],
 }
 export const pagesFor = (r?: Role | null): Page[] => PAGES[r ?? 'admin'] ?? PAGES.admin
 export const canPage = (r: Role | undefined | null, p: Page) => pagesFor(r).includes(p)

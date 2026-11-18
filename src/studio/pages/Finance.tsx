@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Wallet, Hourglass, Gift, TrendingUp, ArrowDownRight, PiggyBank } from 'lucide-react'
 import { useStudio } from '../store'
+import { saveText } from '../../lib/native'
 import { useUI } from '../ui'
 import { revenueOf, toCollect, fines } from '../derive'
 import { Card, PageHead, Kpi, AreaChart, Bars } from '../common'
@@ -61,7 +62,7 @@ function MonthReport() {
     const head = ['Дата', 'Время', 'Зал', 'Клиент', 'Телефон', 'Статус', 'Стоимость', 'Бонусы', 'Штрафы', 'Удержание', 'Получено', 'Оплата', 'Источник']
     const lines = rows.map(b => [b.date, timeRange(b.start, b.hours), hallById(b.hall).name, b.name, b.phone, b.status, b.total, b.bonusUsed || 0, fines(b), b.penalty || 0, revenueOf(b), PAY_METHODS.find(p => p[0] === b.payMethod)?.[1] ?? '', b.source])
     const csv = '﻿' + [head, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n')
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `moloko-${key}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+    saveText(`moloko-${key}.csv`, 'text/csv;charset=utf-8', csv)
   }
   const delta = prevRev ? Math.round((revenue / prevRev - 1) * 100) : null
 
