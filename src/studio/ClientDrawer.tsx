@@ -92,7 +92,7 @@ function Body({ c }: { c: Client }) {
           <button key={b.id} onClick={() => { openClient(null); openBooking(b.id) }} className="flex items-center gap-3 rounded-2xl p-2.5 text-left hover:bg-[var(--card-3)] transition-colors" style={{ background: 'var(--card-2)' }}>
             <img src={hallById(b.hall).img} alt="" className="size-12 rounded-xl object-cover shrink-0" />
             <span className="flex-1 min-w-0">
-              <span className="block text-[14px] font-medium">{dShort(b.date)} · {timeRange(b.start, b.hours)}</span>
+              <span className="block text-[14px] font-medium">{dShort(b.date)} · <span className="whitespace-nowrap num">{timeRange(b.start, b.hours)}</span></span>
               <span className="block text-[12.5px] truncate" style={{ color: 'var(--muted)' }}>{hallById(b.hall).name} · {b.kind || 'Съёмка'}{owner ? ` · ${money(revenueOf(b) || b.total)}` : ''}</span>
             </span>
             <StatusPill s={b.status} />
@@ -163,5 +163,5 @@ function Body({ c }: { c: Client }) {
 const compactMoney = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1).replace('.', ',')}м` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : num(n)
 
 function Stat({ k, v, tone }: { k: string; v: string; tone?: string }) {
-  return <div className="rounded-2xl p-2.5 text-center" style={{ background: 'var(--card-2)' }}><div className="font-display text-[17px] num" style={{ color: tone }}>{v}</div><div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>{k}</div></div>
+  return <div className="rounded-2xl px-1.5 py-2.5 sm:p-2.5 text-center min-w-0" style={{ background: 'var(--card-2)' }}><div className="font-display text-[15px] sm:text-[17px] num whitespace-nowrap" style={{ color: tone }}>{v}</div><div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>{k}</div></div>
 }
