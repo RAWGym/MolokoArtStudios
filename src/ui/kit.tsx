@@ -5,34 +5,29 @@ import { X, Check, AlertTriangle, Info, Minus, Plus } from 'lucide-react'
 import clsx from 'clsx'
 import type { Status } from '../lib/types'
 import { initials } from '../lib/format'
+import { LOGO_VIEWBOX, LOGO_WORD_VIEWBOX, MARK_VIEWBOX, MARK_CIRCLE, P_CIRCLE, P_INNER, P_WORD, P_SUB } from './logo'
 
 export const cx = clsx
 
 /* ------------------------------------------------------------ logo (MOΛOKO / art studios) */
-export function Logo({ className, circle = 'var(--accent)', inner = 'var(--bg)', ink = 'var(--accent)', sub = true, style }: { className?: string; circle?: string; inner?: string; ink?: string; sub?: boolean; style?: CSSProperties }) {
+export function Logo({ className, circle = 'var(--logo)', inner = 'var(--logo-inner)', ink = 'var(--logo-ink)', sub = true, style }: { className?: string; circle?: string; inner?: string; ink?: string; sub?: boolean; style?: CSSProperties }) {
   return (
-    <svg viewBox="0 0 256 108" className={className} style={style} role="img" aria-label="Moloko Art Studios">
-      <circle cx="52" cy="54" r="50" fill={circle} />
-      <g fill="none" strokeWidth="3">
-        <polyline stroke={inner} points="22,72 22,37 37,62 52,37 52,72" />
-        <ellipse stroke={inner} cx="77" cy="54.5" rx="16" ry="17.5" />
-        <polyline stroke={ink} points="106,72 119,37 132,72" />
-        <ellipse stroke={ink} cx="157" cy="54.5" rx="16" ry="17.5" />
-        <line stroke={ink} x1="185" y1="37" x2="185" y2="72" />
-        <polyline stroke={ink} points="208,37 186,56 209,72" />
-        <ellipse stroke={ink} cx="234" cy="54.5" rx="16" ry="17.5" />
-      </g>
-      {sub && <text fill={ink} x="250" y="98" textAnchor="end" fontFamily="Onest,system-ui,sans-serif" fontSize="15" letterSpacing="1">art studios</text>}
+    <svg viewBox={sub ? LOGO_VIEWBOX : LOGO_WORD_VIEWBOX} className={className} style={style} role="img" aria-label="Moloko Art Studios">
+      <path fill={circle} fillRule="evenodd" d={P_CIRCLE} />
+      <path fill={inner} fillRule="evenodd" d={P_INNER} />
+      <path fill={ink} fillRule="evenodd" d={P_WORD} />
+      {sub && <path fill={ink} fillRule="evenodd" d={P_SUB} />}
     </svg>
   )
 }
+/** the round mark: circle with the letters that sit inside it */
 export function LogoMark({ size = 36, className }: { size?: number; className?: string }) {
   return (
-    <svg viewBox="0 0 104 104" width={size} height={size} className={className} aria-hidden>
-      <circle cx="52" cy="52" r="50" fill="var(--accent)" />
-      <g fill="none" strokeWidth="3.4" stroke="var(--accent-ink)">
-        <polyline points="20,70 20,35 36,60 52,35 52,70" />
-        <ellipse cx="74" cy="52.5" rx="13" ry="17.5" />
+    <svg viewBox={MARK_VIEWBOX} width={size} height={size} className={className} aria-hidden>
+      <defs><clipPath id="moloko-mark-clip"><circle cx={MARK_CIRCLE.cx} cy={MARK_CIRCLE.cy} r={MARK_CIRCLE.r} /></clipPath></defs>
+      <g clipPath="url(#moloko-mark-clip)">
+        <circle cx={MARK_CIRCLE.cx} cy={MARK_CIRCLE.cy} r={MARK_CIRCLE.r} fill="var(--logo)" />
+        <path fill="var(--logo-inner)" fillRule="evenodd" d={P_INNER} />
       </g>
     </svg>
   )

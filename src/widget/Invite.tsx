@@ -39,7 +39,7 @@ export default function Invite({ id }: { id: string }) {
         {h.video ? <video src={h.video} poster={h.img} autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover" />
           : <img src={h.img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(10,10,9,.5), transparent 30%, transparent 55%, rgba(10,10,9,.8))' }} />
-        <div className="absolute top-0 inset-x-0 px-5 sm:px-8 pt-[max(16px,env(safe-area-inset-top))]"><Logo className="h-8 w-auto" circle="#3A6367" inner="#FFF9ED" ink="#FFF9ED" /></div>
+        <div className="absolute top-0 inset-x-0 px-5 sm:px-8 pt-[max(16px,env(safe-area-inset-top))]"><Logo className="h-10 w-auto" circle="#0D4042" inner="#FFF9ED" ink="#FFF9ED" /></div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, ease: [.16, 1, .3, 1] }} className="absolute bottom-0 inset-x-0 px-5 sm:px-8 lg:px-12 pb-12 text-white">
           <div className="text-[11px] tracking-[.22em] uppercase opacity-80">Вас ждут на съёмку</div>
           <h1 className="font-display font-light text-[52px] sm:text-[72px] leading-none tracking-[.06em] mt-2">{h.name}</h1>

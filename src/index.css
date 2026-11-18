@@ -46,6 +46,9 @@
   --accent: #3A6367;
   --accent-2: #2E5054;
   --accent-ink: #FFF9ED;
+  --logo: #0D4042;
+  --logo-inner: #FFF9ED;
+  --logo-ink: #0D4042;
   --accent-soft: rgba(58, 99, 103, .10);
   --gold: #A9823F;
   --gold-soft: rgba(169, 130, 63, .14);
@@ -76,6 +79,9 @@
   --line: rgba(255, 244, 230, .08);
   --line-2: rgba(255, 244, 230, .15);
   --accent: #93C9C3;
+  --logo: #1F5658;
+  --logo-inner: #FFF9ED;
+  --logo-ink: #EDE5D8;
   --accent-2: #B5DDD8;
   --accent-ink: #0D1C1B;
   --accent-soft: rgba(147, 201, 195, .13);
@@ -95,6 +101,9 @@
   --scene: url(/img/beige.jpg);
   --veil: linear-gradient(180deg, rgba(246, 238, 226, .70), rgba(244, 236, 224, .88));
   --bg: #EFE6D8;
+  --logo: #0D4042;
+  --logo-inner: #FFF9ED;
+  --logo-ink: #0D4042;
   --bg-2: #E8DDCC;
   --card: rgba(255, 252, 247, .62);
   --card-2: rgba(60, 40, 20, .045);

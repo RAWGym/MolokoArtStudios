@@ -192,7 +192,7 @@ function Stage({ hall, S, step, onHall, onInstall, bonus, installed, onAccount }
       <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(10,10,9,.55) 0%, rgba(10,10,9,0) 26%, rgba(10,10,9,0) 50%, rgba(10,10,9,.78) 100%)' }} />
 
       <div className="absolute top-0 inset-x-0 flex items-center justify-between px-5 sm:px-8 pt-[max(16px,env(safe-area-inset-top))]">
-        <Logo className="h-8 w-auto" circle="#3A6367" inner="#FFF9ED" ink="#FFF9ED" />
+        <Logo className="h-10 w-auto" circle="#0D4042" inner="#FFF9ED" ink="#FFF9ED" />
         <div className="flex items-center gap-2">
           <button onClick={onAccount} className="h-9 px-3.5 rounded-full inline-flex items-center gap-1.5 text-[13px] font-semibold text-white active:scale-95 transition-transform" style={{ background: 'rgba(255,255,255,.16)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,.22)' }}><UserRound className="size-3.5" />{me ? (me.name?.split(' ')[0] || 'Кабинет') : 'Войти'}</button>
           {bonus && bonus.balance > 0 && <span className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[13px] font-semibold text-white" style={{ background: 'rgba(255,255,255,.16)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,.22)' }}><Gift className="size-3.5" />{bonus.balance.toLocaleString('ru-RU')}</span>}
@@ -608,7 +608,7 @@ function StepDone({ done, onInstall, onAgain, installed }: { done: Done; onInsta
       {!installed && (
         <motion.button initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .45, duration: .6, ease: [.16, 1, .3, 1] }} onClick={onInstall}
           className="mt-4 w-full text-left rounded-[24px] p-4 flex items-center gap-4" style={{ background: 'var(--ink)', color: 'var(--bg)' }}>
-          <span className="size-14 rounded-[16px] grid place-items-center shrink-0" style={{ background: '#3A6367' }}><Logo className="w-11" circle="transparent" inner="#FFF9ED" ink="#FFF9ED" sub={false} /></span>
+          <span className="size-14 rounded-[16px] grid place-items-center shrink-0" style={{ background: '#0D4042' }}><Logo className="w-11" circle="transparent" inner="#FFF9ED" ink="#FFF9ED" sub={false} /></span>
           <span className="flex-1"><b className="block text-[15px]">Moloko на главном экране</b><span className="text-[12.5px] opacity-70">Бронь в два касания, бонусы всегда под рукой</span></span>
           <span className="btn btn-sm" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>Установить</span>
         </motion.button>

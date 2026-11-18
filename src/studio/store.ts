@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { sb, fromRow, toRow, clientFromRow, txFromRow, staffFromRow, auditFromRow, moneyFromRow, certFromRow, requestFromRow, selectAll, staffFn, clientFn, loginEmail, ApiError, errCode } from '../lib/supabase'
-import { mergeSettings, DEFAULT_SETTINGS, hallById, applyCatalog } from '../lib/catalog'
+import { mergeSettings, DEFAULT_SETTINGS, applyCatalog } from '../lib/catalog'
 import type { Booking, BonusTx, ClientRow, Settings, Staff, AuditRow, MoneyRow, Cert, RequestRow, Role } from '../lib/types'
 import { can } from './perm'
-import { dShort, pad, normPhone } from '../lib/format'
+import { pad, normPhone } from '../lib/format'
 import { toast } from '../ui/kit'
+import { onBooking, onRequest, onClient, onMoney, markOwn, useNotify, startReminders, stopReminders } from './notify'
 
 type Phase = 'boot' | 'setup' | 'login' | 'app'
 
@@ -66,7 +67,7 @@ export const useStudio = create<State>((set, get) => ({
     const { data: { session } } = await sb.auth.getSession()
     if (session) {
       const me = await fetchMe(session.user.id)
-      if (me) { set({ me, phase: 'app' }); await get().loadAll(); return }
+      if (me) { useNotify.getState().bind(me.userId); set({ me, phase: 'app' }); await get().loadAll(); return }
       await sb.auth.signOut()
     }
     const { data } = await sb.rpc('moloko_needs_setup')
@@ -83,12 +84,14 @@ export const useStudio = create<State>((set, get) => ({
     if (error || !data.user) throw new ApiError(/banned/i.test(error?.message ?? '') ? 'disabled' : 'bad_credentials')
     const me = await fetchMe(data.user.id)
     if (!me) { await sb.auth.signOut(); throw new ApiError('disabled') }
+    useNotify.getState().bind(me.userId)
     set({ me, phase: 'app' })
     await get().loadAll()
   },
 
   async logout() {
     channel?.unsubscribe(); channel = null
+    stopReminders(); useNotify.getState().bind(null)
     await sb.auth.signOut()
     set({ me: null, phase: 'login', bookings: [], clients: [], tx: [], staff: [], audit: [], money: [], certs: [], requests: [], accounts: [], loaded: false })
   },
@@ -116,6 +119,7 @@ export const useStudio = create<State>((set, get) => ({
       return
     }
     if (!channel) subscribe(set, get)
+    startReminders(() => get().bookings)
   },
 
   async refresh() {
@@ -135,6 +139,7 @@ export const useStudio = create<State>((set, get) => ({
 
   async updateBooking(id, patch) {
     const base = get().bookings.find(b => b.id === id)
+    markOwn(id)
     const row = toRow(patch, base)
     const prev = get().bookings
     if (base) set({ bookings: sortB(prev.map(b => b.id === id ? { ...b, ...patch } : b)) })
@@ -153,6 +158,7 @@ export const useStudio = create<State>((set, get) => ({
 
   async upsertClient(phone, patch) {
     const p = normPhone(phone)
+    markOwn(p)
     const row: Record<string, unknown> = { phone: p }
     if (patch.name !== undefined) row.name = patch.name
     if (patch.note !== undefined) row.note = patch.note
@@ -308,18 +314,16 @@ function subscribe(set: (p: Partial<State>) => void, get: () => State) {
       const cur = get().bookings
       if (p.eventType === 'DELETE') { set({ bookings: cur.filter(b => b.id !== p.old.id) }); return }
       const nb = fromRow(p.new)
-      const isNew = !cur.some(b => b.id === nb.id)
+      const prev = cur.find(b => b.id === nb.id)
       set({ bookings: sortB([...cur.filter(b => b.id !== nb.id), nb]) })
-      if (isNew && nb.source === 'Виджет' && nb.status === 'new') {
-        toast(`Новая заявка: ${nb.name}, ${hallById(nb.hall).name} ${dShort(nb.date)} ${pad(nb.start)}:00`, 'info')
-        try { navigator.vibrate?.(60) } catch { /* noop */ }
-        notifyNew(nb)
-      }
+      onBooking(prev, nb, get().me)
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_clients' }, (p: any) => {
       const cur = get().clients
       if (p.eventType === 'DELETE') { set({ clients: cur.filter(c => c.phone !== p.old.phone) }); return }
-      const c = clientFromRow(p.new); set({ clients: [...cur.filter(x => x.phone !== c.phone), c] })
+      const c = clientFromRow(p.new); const prev = cur.find(x => x.phone === c.phone)
+      set({ clients: [...cur.filter(x => x.phone !== c.phone), c] })
+      onClient(prev, c)
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moloko_bonus_tx' }, (p: any) => {
       const t = txFromRow(p.new); set({ tx: [...get().tx.filter(x => x.id !== t.id), t] })
@@ -328,14 +332,16 @@ function subscribe(set: (p: Partial<State>) => void, get: () => State) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_requests' }, (p: any) => {
       const cur = get().requests
       if (p.eventType === 'DELETE') { set({ requests: cur.filter(r => r.id !== p.old.id) }); return }
-      const r = requestFromRow(p.new); const isNew = !cur.some(x => x.id === r.id)
+      const r = requestFromRow(p.new); const prev = cur.find(x => x.id === r.id)
       set({ requests: [r, ...cur.filter(x => x.id !== r.id)] })
-      if (isNew && get().me?.role === 'owner' && r.createdBy !== get().me?.userId) toast('Новый запрос на подтверждение', 'info')
+      onRequest(prev, r, get().me)
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_money' }, (p: any) => {
       const cur = get().money
       if (p.eventType === 'DELETE') { set({ money: cur.filter(r => r.id !== p.old.id) }); return }
-      const r = moneyFromRow(p.new); set({ money: [...cur.filter(x => x.id !== r.id), r] })
+      const r = moneyFromRow(p.new); const prev = cur.find(x => x.id === r.id)
+      set({ money: [...cur.filter(x => x.id !== r.id), r] })
+      onMoney(prev, r, get().me)
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moloko_certs' }, (p: any) => {
       const cur = get().certs
@@ -347,13 +353,6 @@ function subscribe(set: (p: Partial<State>) => void, get: () => State) {
       if (status === 'SUBSCRIBED') set({ live: 'live' })
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') set({ live: 'offline' })
     })
-}
-
-function notifyNew(b: Booking) {
-  try {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || document.visibilityState === 'visible') return
-    new Notification('Новая заявка · Moloko', { body: `${b.name} · ${hallById(b.hall).name} · ${dShort(b.date)} ${pad(b.start)}:00`, icon: '/icons/icon-192.png', tag: b.id })
-  } catch { /* unsupported */ }
 }
 
 // keep the session fresh across tabs

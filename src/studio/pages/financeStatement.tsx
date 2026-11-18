@@ -5,10 +5,12 @@ import { useStudio } from '../store'
 import { Card } from '../common'
 import { Field, Empty, toast } from '../../ui/kit'
 import { STUDIO } from '../../lib/catalog'
+import { logoSvg } from '../../ui/logo'
+import { printHtml } from '../../lib/native'
 import { money, num, today, ymd, addDays, parseYmd, pad } from '../../lib/format'
 import { buildEntries, METHOD, type Entry } from './financeLedger'
 
-const LOGO = `<svg viewBox="0 0 256 108" width="150" xmlns="http://www.w3.org/2000/svg"><circle cx="52" cy="54" r="50" fill="#3A6367"/><g fill="none" stroke-width="3"><polyline stroke="#FFF9ED" points="22,72 22,37 37,62 52,37 52,72"/><ellipse stroke="#FFF9ED" cx="77" cy="54.5" rx="16" ry="17.5"/><polyline stroke="#3A6367" points="106,72 119,37 132,72"/><ellipse stroke="#3A6367" cx="157" cy="54.5" rx="16" ry="17.5"/><line stroke="#3A6367" x1="185" y1="37" x2="185" y2="72"/><polyline stroke="#3A6367" points="208,37 186,56 209,72"/><ellipse stroke="#3A6367" cx="234" cy="54.5" rx="16" ry="17.5"/></g><text fill="#3A6367" x="250" y="98" text-anchor="end" font-family="Onest,system-ui,sans-serif" font-size="15" letter-spacing="1">art studios</text></svg>`
+const LOGO = logoSvg({ width: 170 })
 
 const dmy = (s: string) => { const d = parseYmd(s); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` }
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
@@ -43,7 +45,7 @@ function statementHtml(list: Entry[], from: string, to: string, studio: string, 
 <style>
 @page{size:A4;margin:16mm 14mm}
 *{box-sizing:border-box}body{font-family:Onest,'Segoe UI',system-ui,-apple-system,sans-serif;color:#1d2a2b;margin:0;font-size:11.5px}
-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #3A6367;padding-bottom:12px}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0D4042;padding-bottom:12px}
 h1{font-size:20px;margin:18px 0 2px;letter-spacing:-.01em}.muted{color:#6b7a7a}
 .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0 18px}
 .kpi div{border:1px solid #dfe6e4;border-radius:10px;padding:10px 12px;background:#FFF9ED}
@@ -53,7 +55,7 @@ table{width:100%;border-collapse:collapse}th{text-align:left;font-size:10px;text
 td{padding:7px 6px;border-bottom:1px solid #eef1f0;vertical-align:top}tr{page-break-inside:avoid}
 .n{color:#9aa6a5;width:28px}.s{color:#6b7a7a;font-size:10.5px;margin-top:1px}
 .a{text-align:right;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}.income{color:#2f6b4f}.expense{color:#a2412f}
-tfoot td{border:0;border-top:2px solid #3A6367;font-weight:700;padding-top:10px}
+tfoot td{border:0;border-top:2px solid #0D4042;font-weight:700;padding-top:10px}
 footer{margin-top:22px;color:#9aa6a5;font-size:10px;display:flex;justify-content:space-between}
 </style></head><body>
 <header><div>${LOGO}</div><div style="text-align:right" class="muted">${esc(studio)}<br>${esc(address)}</div></header>
@@ -78,13 +80,15 @@ export default function Statement() {
   const t = totals(list)
 
   const download = () => {
+    const html = statementHtml(list, lo, hi, 'Moloko Art Studios', STUDIO.address)
+    if (printHtml(html, `Выписка ${dmy(lo)}–${dmy(hi)}`)) return
     setBusy(true)
     const frame = document.createElement('iframe')
     frame.setAttribute('aria-hidden', 'true')
     Object.assign(frame.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' })
     document.body.appendChild(frame)
     const doc = frame.contentDocument!
-    doc.open(); doc.write(statementHtml(list, lo, hi, 'Moloko Art Studios', STUDIO.address)); doc.close()
+    doc.open(); doc.write(html); doc.close()
     const go = () => {
       try { frame.contentWindow!.focus(); frame.contentWindow!.print() } catch { toast('Не удалось открыть печать', 'err') }
       setTimeout(() => { frame.remove(); setBusy(false) }, 1500)

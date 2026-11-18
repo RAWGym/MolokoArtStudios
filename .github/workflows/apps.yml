@@ -1,0 +1,150 @@
+# Builds the Moloko CRM apps (Android APK, Windows installer) and publishes them.
+# main: files go to the public "moloko-apps" bucket + latest.json, which the apps poll for auto-update.
+# other branches: a test build only (preview/ in the bucket and a GitHub pre-release with the logs).
+name: Apps
+
+on:
+  push:
+    branches: [main, apps]
+    paths: ['apps/**', '.github/workflows/apps.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_CODE: ${{ github.run_number }}
+  VERSION_NAME: 1.0.${{ github.run_number }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build APK
+        working-directory: apps/android
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/android.log"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/MolokoCRM-$VERSION_NAME.apk"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android
+          if-no-files-found: ignore
+          path: |
+            MolokoCRM-*.apk
+            android.log
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        shell: pwsh
+        run: |
+          dotnet build apps/desktop/MolokoCRM.csproj -c Release -p:Version=$env:VERSION_NAME -nologo 2>&1 | Tee-Object -FilePath windows.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $env:APP_VERSION = $env:VERSION_NAME
+          & $iscc apps/desktop/installer.iss 2>&1 | Tee-Object -FilePath windows.log -Append
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item apps/desktop/out/MolokoCRM-Setup.exe "MolokoCRM-Setup-$env:VERSION_NAME.exe"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows
+          if-no-files-found: ignore
+          path: |
+            MolokoCRM-Setup-*.exe
+            windows.log
+
+  publish:
+    needs: [android, windows]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      FN: https://erztkmhaehqpgqgfwjsh.supabase.co/functions/v1/moloko-apps
+      BASE: https://erztkmhaehqpgqgfwjsh.supabase.co/storage/v1/object/public/moloko-apps
+      GH_TOKEN: ${{ github.token }}
+      ANDROID_RESULT: ${{ needs.android.result }}
+      WINDOWS_RESULT: ${{ needs.windows.result }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: Publish
+        run: |
+          set -u
+          ls -la out || true
+          MAIN=false; [ "$GITHUB_REF" = "refs/heads/main" ] && MAIN=true
+          V=$VERSION_NAME; C=$VERSION_CODE
+          APK=out/MolokoCRM-$V.apk; EXE=out/MolokoCRM-Setup-$V.exe
+          if $MAIN; then PRE=""; else PRE="preview/"; fi
+
+          # local file -> bucket path ("#" suffix = the same file under a stable name)
+          declare -A F
+          [ -f "$APK" ] && F["$APK"]="${PRE}android/MolokoCRM-$V.apk" && F["$APK#"]="${PRE}android/MolokoCRM.apk"
+          [ -f "$EXE" ] && F["$EXE"]="${PRE}windows/MolokoCRM-Setup-$V.exe" && F["$EXE#"]="${PRE}windows/MolokoCRM-Setup.exe"
+          [ -f out/android.log ] && F["out/android.log"]="logs/$C/android.log"
+          [ -f out/windows.log ] && F["out/windows.log"]="logs/$C/windows.log"
+
+          OK=false; [ "$ANDROID_RESULT" = success ] && [ "$WINDOWS_RESULT" = success ] && OK=true
+          if $OK; then
+            jq -n --arg v "$V" --argjson c "$C" --arg d "$(date -u +%FT%TZ)" --arg base "$BASE/$PRE" \
+              --argjson asz "$(stat -c%s "$APK")" --argjson wsz "$(stat -c%s "$EXE")" \
+              '{version:$v, code:$c, date:$d,
+                android:{version:$v, code:$c, url:($base+"android/MolokoCRM-"+$v+".apk"), size:$asz},
+                windows:{version:$v, code:$c, url:($base+"windows/MolokoCRM-Setup-"+$v+".exe"), size:$wsz}}' > out/latest.json
+            F["out/latest.json"]="${PRE}latest.json"
+          fi
+
+          paths=$(for k in "${!F[@]}"; do echo "${F[$k]}"; done | jq -R . | jq -sc '{paths:.}')
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=moloko-apps" | jq -r .value)
+          RESP=$(curl -sS -X POST "$FN" -H "x-gh-oidc: $TOKEN" -H 'content-type: application/json' -d "$paths")
+          echo "$RESP" | jq -c '{main, error, path, detail}' || echo "$RESP"
+          UP=""
+          for k in "${!F[@]}"; do
+            [[ "$k" == "out/latest.json" ]] && continue
+            src="${k%#}"; dst="${F[$k]}"; url=$(echo "$RESP" | jq -r --arg p "$dst" '.urls[$p] // empty')
+            if [ -z "$url" ]; then UP+="- $dst: no upload url"$'\n'; continue; fi
+            case "$dst" in *.apk) ct=application/vnd.android.package-archive;; *.exe) ct=application/vnd.microsoft.portable-executable;; *) ct=text/plain;; esac
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT "$url" -H "content-type: $ct" -H 'x-upsert: true' -H 'cache-control: max-age=300' --data-binary @"$src")
+            UP+="- $dst: $code"$'\n'
+          done
+          # the manifest goes last, so apps never see a version whose files are not there yet
+          if [ -n "${F[out/latest.json]:-}" ]; then
+            url=$(echo "$RESP" | jq -r --arg p "${F[out/latest.json]}" '.urls[$p] // empty')
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT "$url" -H 'content-type: application/json' -H 'x-upsert: true' -H 'cache-control: max-age=60' --data-binary @out/latest.json)
+            UP+="- ${F[out/latest.json]}: $code"$'\n'
+          fi
+          echo "$UP"
+
+          # GitHub release with a readable summary and the tail of any failing log
+          if $MAIN; then TAG="apps-v$V"; TITLE="Moloko CRM $V"; PREREL=""; else TAG="apps-test-$C"; TITLE="Moloko CRM $V (test)"; PREREL="--prerelease"; fi
+          {
+            echo "Moloko CRM $V · android: $ANDROID_RESULT · windows: $WINDOWS_RESULT · commit ${GITHUB_SHA::7}"
+            echo; echo "Uploads:"; echo "$UP"
+            if $MAIN && $OK; then echo "Android: $BASE/android/MolokoCRM.apk"; echo "Windows: $BASE/windows/MolokoCRM-Setup.exe"; fi
+            for n in android windows; do
+              if [ "$n" = android ]; then r=$ANDROID_RESULT; else r=$WINDOWS_RESULT; fi
+              if [ "$r" != success ] && [ -f "out/$n.log" ]; then
+                echo; echo "### $n log (tail)"; echo '```'; grep -v '^\s*$' "out/$n.log" | tail -n 120 | cut -c1-400; echo '```'
+              fi
+            done
+          } > notes.md
+          ASSETS=$(ls out/*.apk out/*.exe 2>/dev/null || true)
+          gh release create "$TAG" $ASSETS --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes-file notes.md $PREREL
+          $OK || exit 1

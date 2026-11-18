@@ -33,7 +33,7 @@ export function InstallSheet({ open, onClose, install, title = 'Приложен
   return (
     <Sheet open={open} onClose={onClose}>
       <div className="flex items-center gap-4 pt-1">
-        <span className="size-16 rounded-[18px] grid place-items-center shrink-0 shadow-lg" style={{ background: '#3A6367' }}><Logo className="w-12" circle="transparent" inner="#FFF9ED" ink="#FFF9ED" sub={false} /></span>
+        <span className="size-16 rounded-[18px] grid place-items-center shrink-0 shadow-lg" style={{ background: '#0D4042' }}><Logo className="w-12" circle="transparent" inner="#FFF9ED" ink="#FFF9ED" sub={false} /></span>
         <div><div className="font-display text-[21px] leading-tight">{title}</div><div className="text-[13.5px] mt-1" style={{ color: 'var(--muted)' }}>{sub}</div></div>
       </div>
       {install.canPrompt ? (

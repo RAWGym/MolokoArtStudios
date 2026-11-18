@@ -1,0 +1,40 @@
+plugins { id 'com.android.application' }
+
+def vCode = (System.getenv('VERSION_CODE') ?: '1') as int
+def vName = System.getenv('VERSION_NAME') ?: '1.0'
+
+android {
+    namespace 'kz.moloko.crm'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'kz.moloko.crm'
+        minSdk 24
+        targetSdk 34
+        versionCode vCode
+        versionName vName
+    }
+    signingConfigs {
+        release {
+            // Private repo; the key only signs this internal staff app so updates install over the old version.
+            storeFile file('../moloko-crm.keystore')
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'moloko-crm-2026'
+            keyAlias 'moloko'
+            keyPassword System.getenv('KEYSTORE_PASSWORD') ?: 'moloko-crm-2026'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.core:core:1.13.1'
+}

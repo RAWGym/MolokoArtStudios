@@ -1,16 +1,19 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download } from 'lucide-react'
 import { pagesFor, ROLE_LABEL, can } from './perm'
 import { useStudio } from './store'
 import { useUI, type Page } from './ui'
-import { cx, Logo, LogoMark, Avatar, Sheet, toast } from '../ui/kit'
+import { cx, Logo, LogoMark, Avatar, Sheet } from '../ui/kit'
+import { IN_APP } from '../lib/native'
 import { errCode } from '../lib/supabase'
 import { store } from '../lib/format'
 import { BookingDrawer } from './BookingDrawer'
 import { BookingForm } from './BookingForm'
 import { ClientDrawer } from './ClientDrawer'
 import { Palette } from './Palette'
+import { useNotify } from './notify'
+import { AppsSheet } from './Apps'
 import { InstallSheet, useInstall } from '../widget/Install'
 import Overview from './pages/Overview'
 import Schedule from './pages/Schedule'
@@ -27,6 +30,7 @@ const LOAD: Partial<Record<Page, () => Promise<{ default: ComponentType }>>> = {
   team: () => import('./pages/Team'),
   requests: () => import('./pages/Requests'),
   journal: () => import('./pages/Journal'),
+  notify: () => import('./pages/Notifications'),
 }
 const PAGES: Record<Page, ComponentType> = {
   overview: Overview, schedule: Schedule, pipeline: Pipeline, clients: Clients,
@@ -41,6 +45,7 @@ const NAV: NavItem[] = [
   { id: 'schedule', label: 'Расписание', short: 'График', icon: CalendarDays },
   { id: 'pipeline', label: 'Заявки', icon: KanbanSquare },
   { id: 'clients', label: 'Клиенты', icon: Users },
+  { id: 'notify', label: 'Уведомления', icon: Bell },
   { id: 'finance', label: 'Финансы', icon: Wallet, manage: true },
   { id: 'analytics', label: 'Аналитика', icon: BarChart3, manage: true },
   { id: 'loyalty', label: 'Бонусы', icon: Gift, manage: true },
@@ -96,13 +101,13 @@ function AuthScreen({ setup }: { setup: boolean }) {
         <img src="/img/black.jpg" alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.75))' }} />
         <div className="absolute left-12 bottom-14 right-12 text-white">
-          <Logo className="h-10 w-auto mb-8" circle="#3A6367" inner="#FFF9ED" ink="#FFF9ED" />
+          <Logo className="h-14 w-auto mb-8" circle="#0D4042" inner="#FFF9ED" ink="#FFF9ED" />
           <div className="font-display font-light text-[44px] leading-[1.05] tracking-[-.01em]">Студия под контролем.<br />Каждый час на виду.</div>
         </div>
       </div>
       <div className="grid place-items-center px-5 py-10 safe-t">
         <motion.form key={shake} onSubmit={submit} animate={shake ? { x: [0, -10, 10, -6, 6, 0] } : {}} transition={{ duration: .4 }} className="w-full max-w-[400px]">
-          <div className="lg:hidden mb-10"><Logo className="h-9 w-auto" /></div>
+          <div className="lg:hidden mb-10"><Logo className="h-12 w-auto" /></div>
           <div className="glass p-6 md:p-8 rise">
             <div className="flex items-center gap-2 eyebrow"><Lock className="size-3.5" />Moloko Studio · CRM</div>
             <h1 className="font-display font-light text-[30px] mt-3 leading-tight">{setup ? 'Первый вход' : 'Вход для команды'}</h1>
@@ -143,6 +148,7 @@ function Shell() {
   const { theme, toggle } = useTheme()
   const install = useInstall()
   const [installOpen, setInstallOpen] = useState(false)
+  const [appsOpen, setAppsOpen] = useState(false)
   const owner = me?.role === 'owner'
   const allowed = pagesFor(me?.role)
   const nav = NAV.filter(n => allowed.includes(n.id))
@@ -152,6 +158,7 @@ function Shell() {
   const tabs = nav.filter(n => !n.manage).slice(0, 4).length >= 3 ? nav.filter(n => !n.manage).slice(0, 4) : nav.slice(0, 4)
   const extra = nav.filter(n => !tabs.includes(n))
   const roleLabel = me ? ROLE_LABEL[me.role] : ''
+  const unread = useNotify(s => s.items.filter(i => !i.read).length)
   useEffect(() => { const t = setTimeout(() => prefetch(allowed), 1200); return () => clearTimeout(t) }, [me?.role]) // eslint-disable-line
 
   useEffect(() => {
@@ -163,19 +170,13 @@ function Shell() {
   }, [])
   useEffect(() => { const t = NAV.find(n => n.id === current); document.title = `${t?.label ?? 'CRM'}${pending ? ` (${pending})` : ''} · Moloko Studio` }, [current, pending])
 
-  const askNotify = async () => {
-    if (typeof Notification === 'undefined') { toast('Браузер не поддерживает уведомления', 'info'); return }
-    const r = await Notification.requestPermission()
-    toast(r === 'granted' ? 'Уведомления о новых заявках включены' : 'Уведомления не разрешены в браузере', r === 'granted' ? 'ok' : 'info')
-  }
-
   const PageC = PAGES[current]
 
   return (
     <div className="min-h-dvh md:pl-[84px] xl:pl-[248px]">
       {/* side dock: icons on tablet, full labels on desktop */}
       <aside className="hidden md:flex fixed left-3 top-3 bottom-3 z-40 w-[68px] xl:w-[228px] flex-col glass !rounded-[26px] p-2.5 xl:p-3">
-        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5 [@media(max-height:960px)]:pb-3"><LogoMark size={40} /><span className="hidden xl:block font-display text-[15px] tracking-[.12em]">MOΛOKO</span></button>
+        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5 [@media(max-height:960px)]:pb-3"><LogoMark size={40} className="xl:hidden" /><Logo className="hidden xl:block h-[46px] w-auto" /></button>
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
           {nav.map((n, i) => {
             const on = current === n.id
@@ -187,6 +188,7 @@ function Shell() {
                   {on && <motion.span layoutId="nav-on" className="absolute inset-0 rounded-[14px]" style={{ background: 'var(--accent)' }} transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                   <n.icon className="relative size-[19px] shrink-0" />
                   <span className="relative hidden xl:block truncate">{n.label}</span>
+                  {n.id === 'notify' && unread > 0 && <span className="absolute xl:static -top-0.5 -right-0.5 xl:ml-auto min-w-5 h-5 px-1.5 rounded-full grid place-items-center text-[11px] font-bold num" style={{ background: on ? 'var(--accent-ink)' : 'var(--accent)', color: on ? 'var(--accent)' : 'var(--accent-ink)' }}>{unread > 99 ? '99+' : unread}</span>}
                   {n.id === 'requests' && pendingReq > 0 && <span className="absolute xl:static -top-0.5 -right-0.5 xl:ml-auto min-w-5 h-5 px-1.5 rounded-full grid place-items-center text-[11px] font-bold num" style={{ background: on ? 'var(--accent-ink)' : 'var(--bad)', color: on ? 'var(--accent)' : '#fff' }}>{pendingReq}</span>}
                   {n.id === 'pipeline' && pending > 0 && <span className={cx('relative ml-auto min-w-5 h-5 px-1.5 rounded-full grid place-items-center text-[11px] font-bold num', 'absolute xl:static -top-0.5 -right-0.5 xl:top-auto xl:right-auto')} style={{ background: on ? 'var(--accent-ink)' : 'var(--warn)', color: on ? 'var(--accent)' : '#1a1206' }}>{pending}</span>}
                 </button>
@@ -195,6 +197,7 @@ function Shell() {
           })}
         </nav>
         <div className="pt-2 mt-2 border-t hairline flex flex-col gap-1">
+          {!IN_APP && <button onClick={() => setAppsOpen(true)} title="Скачать приложение" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] font-medium hover:bg-[var(--card-2)]" style={{ color: 'var(--accent)' }}><Download className="size-[18px] shrink-0" /><span className="hidden xl:block">Скачать приложение</span></button>}
           <a href="/" target="_blank" rel="noopener" title="Страница брони" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]"><ExternalLink className="size-[18px] shrink-0" /><span className="hidden xl:block">Страница брони</span></a>
           <button onClick={toggle} title="Тема" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]">{theme === 'dark' ? <Sun className="size-[18px] shrink-0" /> : <Moon className="size-[18px] shrink-0" />}<span className="hidden xl:block">{theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}</span></button>
           <div className="flex items-center gap-2.5 px-1.5 xl:px-2 pt-2">
@@ -217,7 +220,10 @@ function Shell() {
             {live === 'live' ? <span className="live-dot" /> : <span className="size-2 rounded-full" style={{ background: live === 'connecting' ? 'var(--warn)' : 'var(--bad)' }} />}
             <span style={{ color: 'var(--muted)' }}>{live === 'live' ? 'Онлайн' : live === 'connecting' ? 'Подключение' : 'Офлайн'}</span>
           </span>
-          {typeof Notification !== 'undefined' && Notification.permission === 'default' && <button className="icon-btn hidden sm:grid glass !rounded-full" onClick={askNotify} title="Уведомления о заявках"><Bell className="size-4" /></button>}
+          <button className="icon-btn relative glass !rounded-full shrink-0" onClick={() => go('notify')} title="Уведомления" aria-label={`Уведомления${unread ? `, новых: ${unread}` : ''}`}>
+            <Bell className="size-4" />
+            <AnimatePresence>{unread > 0 && <motion.span key={unread} initial={{ scale: .4 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full grid place-items-center text-[10px] font-bold num" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>{unread > 99 ? '99+' : unread}</motion.span>}</AnimatePresence>
+          </button>
           {can(me?.role, 'book') && <button className="btn btn-primary h-10 md:h-11 px-4" onClick={() => newBooking()}><Plus className="size-4" /><span className="hidden sm:inline">Бронь</span></button>}
         </div>
       </header>
@@ -263,8 +269,8 @@ function Shell() {
         <div className="mt-3 flex flex-col">
           {[
             { icon: theme === 'dark' ? Sun : Moon, label: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема', run: toggle },
-            ...(typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? [{ icon: Bell, label: 'Уведомления о заявках', run: askNotify }] : []),
-            ...(!install.installed ? [{ icon: Plus, label: 'Установить CRM на экран', run: () => { setMore(false); setInstallOpen(true) } }] : []),
+            ...(!IN_APP ? [{ icon: Download, label: 'Скачать приложение', run: () => { setMore(false); setAppsOpen(true) } }] : []),
+            ...(!install.installed && !IN_APP ? [{ icon: Plus, label: 'Установить CRM на экран', run: () => { setMore(false); setInstallOpen(true) } }] : []),
             { icon: ExternalLink, label: 'Страница брони для клиентов', run: () => window.open('/', '_blank') },
             { icon: LogOut, label: 'Выйти', run: logout },
           ].map(r => <button key={r.label} onClick={r.run} className="h-12 flex items-center gap-3 px-2 border-b hairline last:border-0 text-[15px]"><r.icon className="size-[18px]" style={{ color: 'var(--muted)' } as any} />{r.label}</button>)}
@@ -275,6 +281,7 @@ function Shell() {
       <BookingForm />
       <ClientDrawer />
       <Palette nav={nav} />
+      <AppsSheet open={appsOpen} onClose={() => setAppsOpen(false)} />
       <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} install={install} title="Moloko CRM" sub="Иконка на экране iPad или телефона — открывается как приложение" />
     </div>
   )
