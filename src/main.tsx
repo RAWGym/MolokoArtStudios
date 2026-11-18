@@ -14,8 +14,10 @@ setTimeout(() => { try { sessionStorage.removeItem('moloko.reloaded') } catch { 
 const Widget = lazy(() => import('./widget/Widget'))
 const Studio = lazy(() => import('./studio/Studio'))
 const Invite = lazy(() => import('./widget/Invite'))
+const Privacy = lazy(() => import('./widget/Privacy'))
 
 const isStudio = /^\/studio/.test(location.pathname)
+const isPrivacy = /^\/privacy\/?$/.test(location.pathname)
 const invite = location.pathname.match(/^\/i\/([0-9a-f-]{36})\/?$/i)?.[1]
 
 function Boot() {
@@ -24,7 +26,7 @@ function Boot() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary><Suspense fallback={<Boot />}>{isStudio ? <Studio /> : invite ? <Invite id={invite} /> : <Widget />}</Suspense></ErrorBoundary>
+    <ErrorBoundary><Suspense fallback={<Boot />}>{isStudio ? <Studio /> : isPrivacy ? <Privacy /> : invite ? <Invite id={invite} /> : <Widget />}</Suspense></ErrorBoundary>
     <Toasts />
   </StrictMode>,
 )

@@ -132,6 +132,20 @@
   color-scheme: light;
 }
 
+/* ------------------------------------------------------------ studio skins (Настройки → Оформление) */
+:root[data-app="studio"][data-theme="dark"][data-skin="white"] { --scene: url(/img/white.jpg); --veil: linear-gradient(180deg, rgba(14, 16, 16, .66), rgba(12, 14, 14, .88)); --accent: #A9D8D2; --accent-2: #C6E7E2; --accent-soft: rgba(169, 216, 210, .13); }
+:root[data-app="studio"][data-theme="light"][data-skin="white"] { --scene: url(/img/white.jpg); --veil: linear-gradient(180deg, rgba(250, 248, 244, .72), rgba(248, 246, 241, .9)); --bg: #F4F1EB; --accent: #2F6E6A; --accent-2: #255A57; --accent-soft: rgba(47, 110, 106, .11); }
+:root[data-app="studio"][data-theme="dark"][data-skin="grey"] { --scene: url(/img/grey.jpg); --veil: linear-gradient(180deg, rgba(12, 13, 15, .64), rgba(11, 12, 14, .88)); --bg: #111214; --accent: #B8C6D2; --accent-2: #D2DCE5; --accent-ink: #101418; --accent-soft: rgba(184, 198, 210, .13); }
+:root[data-app="studio"][data-theme="light"][data-skin="grey"] { --scene: url(/img/grey.jpg); --veil: linear-gradient(180deg, rgba(240, 241, 242, .74), rgba(236, 237, 238, .9)); --bg: #E9EAEB; --accent: #3F5566; --accent-2: #2F4250; --accent-ink: #F6F8FA; --accent-soft: rgba(63, 85, 102, .11); }
+:root[data-app="studio"][data-theme="dark"][data-skin="velvet"] { --scene: url(/img/black.jpg); --veil: linear-gradient(180deg, rgba(20, 8, 10, .6), rgba(16, 7, 9, .88)); --bg: #140A0B; --accent: #E59AA2; --accent-2: #F0B8BE; --accent-ink: #2A0D11; --accent-soft: rgba(229, 154, 162, .14); }
+:root[data-app="studio"][data-theme="light"][data-skin="velvet"] { --scene: url(/img/black.jpg); --veil: linear-gradient(180deg, rgba(248, 238, 236, .76), rgba(246, 236, 234, .9)); --bg: #F3E7E4; --accent: #8E2E3A; --accent-2: #74222E; --accent-ink: #FFF6F4; --accent-soft: rgba(142, 46, 58, .1); }
+:root[data-app="studio"][data-theme="dark"][data-skin="gold"] { --scene: url(/img/beige.jpg); --veil: linear-gradient(180deg, rgba(18, 14, 8, .62), rgba(15, 12, 8, .88)); --bg: #13100B; --accent: #E2C287; --accent-2: #EDD6A9; --accent-ink: #241A08; --accent-soft: rgba(226, 194, 135, .14); }
+:root[data-app="studio"][data-theme="light"][data-skin="gold"] { --scene: url(/img/beige.jpg); --veil: linear-gradient(180deg, rgba(248, 241, 228, .72), rgba(246, 238, 224, .9)); --bg: #F2E9D9; --accent: #8A6424; --accent-2: #70501B; --accent-ink: #FFF9ED; --accent-soft: rgba(138, 100, 36, .12); }
+:root[data-app="studio"][data-theme="dark"][data-skin="plain"] { --scene: none; --veil: none; --bg: #161514; --card: #1F1D1B; --panel: #1C1A18; --glass-hi: transparent; }
+:root[data-app="studio"][data-theme="light"][data-skin="plain"] { --scene: none; --veil: none; --bg: #F3F0EA; --card: #FFFFFF; --panel: #FFFFFF; --glass-hi: transparent; }
+:root[data-app="studio"][data-skin="plain"] .scene { display: none; }
+:root[data-app="studio"][data-skin="plain"] .glass, :root[data-app="studio"][data-skin="plain"] .panel { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
 @layer base {
   /* grid and flex children never push their track wider than the screen */
   .grid > *, .flex > .flex-1 { min-width: 0; }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Share, SquarePlus, MoreVertical, Download, Check } from 'lucide-react'
 import { Sheet, Segmented, Logo } from '../ui/kit'
+import { t, useLang } from './i18n'
 
 interface BIPEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 let deferred: BIPEvent | null = null
@@ -25,9 +26,13 @@ export type InstallApi = ReturnType<typeof useInstall>
 
 const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
-export function InstallSheet({ open, onClose, install, title = 'Приложение Moloko', sub = 'Без App Store — ставится прямо с сайта за 10 секунд' }: { open: boolean; onClose: () => void; install: InstallApi; title?: string; sub?: string }) {
+export function InstallSheet({ open, onClose, install, title = t('Приложение Moloko'), sub = t('Без App Store — ставится прямо с сайта за 10 секунд') }: { open: boolean; onClose: () => void; install: InstallApi; title?: string; sub?: string }) {
   const [os, setOs] = useState<'ios' | 'android'>(() => (typeof navigator !== 'undefined' && !isIOS() && /Android/i.test(navigator.userAgent) ? 'android' : 'ios'))
-  const steps = os === 'ios'
+  const kk = useLang(s => s.lang) === 'kk'
+  const steps = kk ? (os === 'ios'
+    ? [[<>Бұл бетті <K>Safari</K> арқылы ашыңыз</>], [<>Экранның төменгі жағындағы <K><Share className="size-3.5" />Бөлісу</K> батырмасын басыңыз</>], [<><K><SquarePlus className="size-3.5" />Басты экранға қосу</K> таңдаңыз</>], [<><K>Қосу</K> басыңыз, дайын</>]]
+    : [[<>Бетті <K>Chrome</K> арқылы ашыңыз</>], [<>Жоғарғы оң жақ бұрыштағы <K><MoreVertical className="size-3.5" /></K> басыңыз</>], [<><K><Download className="size-3.5" />Қолданбаны орнату</K> таңдаңыз</>], [<>Растаңыз, белгіше экранда пайда болады</>]])
+  : os === 'ios'
     ? [[<>Откройте эту страницу в <K>Safari</K></>], [<>Нажмите <K><Share className="size-3.5" />Поделиться</K> внизу экрана</>], [<>Выберите <K><SquarePlus className="size-3.5" />На экран «Домой»</K></>], [<>Нажмите <K>Добавить</K> — готово</>]]
     : [[<>Откройте страницу в <K>Chrome</K></>], [<>Нажмите <K><MoreVertical className="size-3.5" /></K> в правом верхнем углу</>], [<>Выберите <K><Download className="size-3.5" />Установить приложение</K></>], [<>Подтвердите — иконка появится на экране</>]]
   return (
@@ -37,7 +42,7 @@ export function InstallSheet({ open, onClose, install, title = 'Приложен
         <div><div className="font-display text-[21px] leading-tight">{title}</div><div className="text-[13.5px] mt-1" style={{ color: 'var(--muted)' }}>{sub}</div></div>
       </div>
       {install.canPrompt ? (
-        <button className="btn btn-primary w-full mt-6 h-[52px]" onClick={async () => { if (await install.prompt()) onClose() }}><Download className="size-4" />Установить</button>
+        <button className="btn btn-primary w-full mt-6 h-[52px]" onClick={async () => { if (await install.prompt()) onClose() }}><Download className="size-4" />{t('Установить')}</button>
       ) : (
         <>
           <Segmented className="mt-6" value={os} onChange={setOs} items={[['ios', 'iPhone'], ['android', 'Android']]} />
@@ -52,9 +57,9 @@ export function InstallSheet({ open, onClose, install, title = 'Приложен
         </>
       )}
       <ul className="mt-6 grid grid-cols-1 gap-2 text-[13.5px]" style={{ color: 'var(--ink-2)' }}>
-        {['Открывается как приложение, без адресной строки', 'Бонусы и последняя бронь всегда под рукой', 'Работает даже при слабом интернете'].map(t => <li key={t} className="flex items-center gap-2"><Check className="size-4 shrink-0" style={{ color: 'var(--accent)' }} />{t}</li>)}
+        {['Открывается как приложение, без адресной строки', 'Бонусы и последняя бронь всегда под рукой', 'Работает даже при слабом интернете'].map(x => <li key={x} className="flex items-center gap-2"><Check className="size-4 shrink-0" style={{ color: 'var(--accent)' }} />{t(x)}</li>)}
       </ul>
-      <button className="btn btn-ghost w-full mt-6" onClick={onClose}>Готово</button>
+      <button className="btn btn-ghost w-full mt-6" onClick={onClose}>{t('Готово')}</button>
     </Sheet>
   )
 }

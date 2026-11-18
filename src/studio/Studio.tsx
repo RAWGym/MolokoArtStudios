@@ -1,13 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download, LifeBuoy, Bug } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download, LifeBuoy, Bug, Settings2 } from 'lucide-react'
 import { pagesFor, ROLE_LABEL, can } from './perm'
 import { useStudio } from './store'
 import { useUI, type Page } from './ui'
 import { cx, Logo, LogoMark, Avatar, Sheet } from '../ui/kit'
 import { IN_APP } from '../lib/native'
 import { errCode } from '../lib/supabase'
-import { store } from '../lib/format'
 import { BookingDrawer } from './BookingDrawer'
 import { BookingForm } from './BookingForm'
 import { ClientDrawer } from './ClientDrawer'
@@ -15,6 +14,7 @@ import { Palette } from './Palette'
 import { useNotify } from './notify'
 import { AppsSheet } from './Apps'
 import { HelpSheet, BugSheet } from './Support'
+import { useTheme as useThemeStore } from './theme'
 import { InstallSheet, useInstall } from '../widget/Install'
 import Overview from './pages/Overview'
 import Schedule from './pages/Schedule'
@@ -32,6 +32,7 @@ const LOAD: Partial<Record<Page, () => Promise<{ default: ComponentType }>>> = {
   requests: () => import('./pages/Requests'),
   journal: () => import('./pages/Journal'),
   notify: () => import('./pages/Notifications'),
+  settings: () => import('./pages/Settings'),
 }
 const PAGES: Record<Page, ComponentType> = {
   overview: Overview, schedule: Schedule, pipeline: Pipeline, clients: Clients,
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { id: 'team', label: 'Команда', icon: ShieldCheck, manage: true },
   { id: 'requests', label: 'Запросы', icon: Inbox, manage: true },
   { id: 'journal', label: 'Журнал', icon: History, manage: true },
+  { id: 'settings', label: 'Настройки', icon: Settings2 },
 ]
 
 export default function Studio() {
@@ -133,14 +135,8 @@ function AuthScreen({ setup }: { setup: boolean }) {
 
 /* ================================================================ shell */
 function useTheme() {
-  const [t, setT] = useState<string>(() => document.documentElement.dataset.theme || 'dark')
-  const toggle = () => {
-    const n = t === 'dark' ? 'light' : 'dark'
-    const apply = () => { document.documentElement.dataset.theme = n; store.set('moloko.theme', n); try { localStorage.setItem('moloko.theme', n) } catch { /* */ } setT(n); (document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null)?.setAttribute('content', n === 'dark' ? '#12100E' : '#EFE6D8') }
-    const d = document as any
-    if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) d.startViewTransition(apply); else apply()
-  }
-  return { theme: t, toggle }
+  const dark = useThemeStore(s => s.dark), toggle = useThemeStore(s => s.toggle)
+  return { theme: dark ? 'dark' : 'light', toggle }
 }
 
 function Shell() {
