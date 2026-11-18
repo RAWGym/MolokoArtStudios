@@ -72,7 +72,7 @@ export default function Overview() {
           : <Kpi label="Часов за месяц" value={monthHours} format={n => num(n)} sub="забронировано" icon={<Wallet className="size-4" />} delay={.15} />}
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-3 md:gap-4 mt-3 md:mt-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3 md:gap-4 mt-3 md:mt-4">
         <Card delay={.1} title={<span className="flex items-baseline gap-2">{owner ? 'Выручка' : 'Часы в залах'}<span className="font-display text-[18px] num" style={{ color: 'var(--accent)' }}>{owner ? money(total) : `${num(total)} ч`}</span></span>} action={<Segmented value={range} onChange={setRange} items={[['week', 'Неделя'], ['month', 'Месяц'], ['year', 'Год']]} />}>
           <AreaChart data={series} height={230} format={owner ? money : (n => `${n} ч`)} />
         </Card>

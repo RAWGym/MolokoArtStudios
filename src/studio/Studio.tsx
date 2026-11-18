@@ -175,15 +175,15 @@ function Shell() {
     <div className="min-h-dvh md:pl-[84px] xl:pl-[248px]">
       {/* side dock: icons on tablet, full labels on desktop */}
       <aside className="hidden md:flex fixed left-3 top-3 bottom-3 z-40 w-[68px] xl:w-[228px] flex-col glass !rounded-[26px] p-2.5 xl:p-3">
-        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5"><LogoMark size={40} /><span className="hidden xl:block font-display text-[15px] tracking-[.12em]">MOΛOKO</span></button>
+        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5 [@media(max-height:960px)]:pb-3"><LogoMark size={40} /><span className="hidden xl:block font-display text-[15px] tracking-[.12em]">MOΛOKO</span></button>
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
           {nav.map((n, i) => {
             const on = current === n.id
             return (
               <div key={n.id}>
-                {n.manage && i > 0 && !nav[i - 1]?.manage && <div className="hidden xl:block eyebrow px-3 pt-4 pb-1.5">Управление</div>}
+                {n.manage && i > 0 && !nav[i - 1]?.manage && <div className="hidden xl:block eyebrow px-3 pt-4 pb-1.5 [@media(max-height:960px)]:pt-2.5 [@media(max-height:960px)]:pb-1">Управление</div>}
                 {n.manage && i > 0 && !nav[i - 1]?.manage && <div className="xl:hidden mx-3 my-2 border-t hairline" />}
-                <button onClick={() => go(n.id)} onMouseEnter={() => LOAD[n.id]?.()} title={n.label} className={cx('group relative w-full h-11 flex items-center gap-3 rounded-[14px] px-3 text-[14px] font-medium transition-colors', on ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--card-2)]')}>
+                <button onClick={() => go(n.id)} onMouseEnter={() => LOAD[n.id]?.()} title={n.label} className={cx('group relative w-full h-11 [@media(max-height:960px)]:h-[38px] flex items-center gap-3 rounded-[14px] px-3 text-[14px] font-medium transition-colors', on ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--card-2)]')}>
                   {on && <motion.span layoutId="nav-on" className="absolute inset-0 rounded-[14px]" style={{ background: 'var(--accent)' }} transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                   <n.icon className="relative size-[19px] shrink-0" />
                   <span className="relative hidden xl:block truncate">{n.label}</span>

@@ -39,8 +39,8 @@ export default function Messages() {
     <>
       <PageHead title="Сообщения" sub="Тексты, которые администратор отправляет клиенту одной кнопкой из карточки брони. Слова в фигурных скобках подставятся сами."
         actions={<button className="btn btn-primary h-10" disabled={!dirty || busy} onClick={save}><Save className="size-4" />Сохранить</button>} />
-      <div className="grid xl:grid-cols-[1.25fr_1fr] gap-3 md:gap-4 items-start">
-        <Card title={TEMPLATE_META[k].title} action={<Segmented value={k} onChange={setK} items={(Object.keys(TEMPLATE_META) as TemplateKey[]).map(x => [x, { contact: 'Связаться', remind: 'Напомнить', thanks: 'Спасибо', invite: 'Приглашение' }[x]])} />}>
+      <div className="grid grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-3 md:gap-4 items-start">
+        <Card title={TEMPLATE_META[k].title} action={<div className="max-w-full overflow-x-auto no-scrollbar"><Segmented value={k} onChange={setK} items={(Object.keys(TEMPLATE_META) as TemplateKey[]).map(x => [x, { contact: 'Связаться', remind: 'Напомнить', thanks: 'Спасибо', invite: 'Приглашение' }[x]])} /></div>}>
           <div className="text-[13px] mb-3" style={{ color: 'var(--muted)' }}>{TEMPLATE_META[k].when}</div>
           <textarea ref={area} className="field !text-[14.5px] leading-relaxed font-[inherit]" rows={14} value={T[k]} onChange={e => setT({ ...T, [k]: e.target.value })} />
           <div className="flex flex-wrap gap-1.5 mt-3">{VARS.map(([v, hint]) => <button key={v} className="chip !h-8 !text-[12.5px]" title={hint} onClick={() => insert(v)}>{v}</button>)}</div>

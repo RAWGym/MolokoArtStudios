@@ -84,7 +84,7 @@ function MonthReport() {
         <Kpi label="Ожидается" value={pending} format={money} icon={<Hourglass className="size-4" />} tone={pending ? 'var(--warn)' : undefined} sub={`без оплаты · штрафы ${compact(fineSum + penalties)}`} delay={.15} />
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-3 md:gap-4 mt-3 md:mt-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3 md:gap-4 mt-3 md:mt-4">
         <Card title="По дням" delay={.1}><AreaChart data={series} height={220} format={money} highlightLast={false} /></Card>
         <Card title="По залам" delay={.15}>
           <Bars items={byHall} format={n => `${compact(n)} ₸`} />

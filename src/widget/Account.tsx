@@ -6,7 +6,7 @@ import { Sheet, Segmented, Counter, toast, cx } from '../ui/kit'
 import { hallById } from '../lib/catalog'
 import { errCode, sb } from '../lib/supabase'
 import { refUrl } from '../lib/messages'
-import { dLabel, maskPhone, normPhone, money, num, plural, timeRange, today, relTime, fmtPhone } from '../lib/format'
+import { maskPhone, normPhone, money, num, plural, timeRange, today, relTime, fmtPhone, dShort, DOW, parseYmd } from '../lib/format'
 import { fetchMe, clientLogin, clientRegister, clientLogout, type Me } from './publicApi'
 
 /* ------------------------------------------------------------ session store */
@@ -143,7 +143,7 @@ function Cabinet({ me, onBook }: { me: Me; onBook: () => void }) {
               <img src={h.img} alt="" className="size-14 rounded-xl object-cover shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-[14.5px] tracking-[.04em]">{h.name}{b.group && <span className="ml-1.5 text-[11px] font-normal" style={{ color: 'var(--accent)' }}>комбо</span>}</div>
-                <div className="text-[12.5px] flex items-center gap-1" style={{ color: 'var(--muted)' }}><CalendarDays className="size-3" />{dLabel(b.date)} · <span className="num">{timeRange(b.start, b.hours)}</span></div>
+                <div className="text-[12.5px] flex items-center gap-1" style={{ color: 'var(--muted)' }}><CalendarDays className="size-3 shrink-0" /><span className="truncate">{dShort(b.date)}, {DOW[parseYmd(b.date).getDay()]} · <span className="num">{timeRange(b.start, b.hours)}</span></span></div>
               </div>
               <div className="text-right shrink-0"><div className="num text-[13.5px] font-semibold">{money(b.total - b.bonus)}</div><div className="text-[11.5px]" style={{ color: sc }}>{sl}</div></div>
             </motion.div>)

@@ -25,7 +25,7 @@ export default function Prices() {
           <button className="btn btn-primary h-10" disabled={!dirty || busy} onClick={save}><Save className="size-4" />Сохранить</button>
         </>} />
 
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-3 md:gap-4 items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 md:gap-4 items-start">
         <div className="flex flex-col gap-3 md:gap-4">
           <Card title="Залы, за час">
             <div className="grid sm:grid-cols-2 gap-3">

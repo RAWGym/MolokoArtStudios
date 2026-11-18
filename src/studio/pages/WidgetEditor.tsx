@@ -55,7 +55,7 @@ export default function WidgetEditor() {
           <button className="btn btn-primary h-10" disabled={!dirty || busy} onClick={save}><Save className="size-4" />{busy ? 'Сохраняем…' : 'Опубликовать'}</button>
         </>} />
 
-      <div className="grid 2xl:grid-cols-[1.5fr_1fr] gap-3 md:gap-4 items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-3 md:gap-4 items-start">
         <div className="flex flex-col gap-3 md:gap-4">
           <Card title={<span className="flex items-center gap-2">Залы <span className="text-[12px] font-normal" style={{ color: 'var(--muted)' }}>перетащите, чтобы поменять порядок</span></span>} action={<button className="btn btn-line btn-sm" onClick={addHall}><Plus className="size-4" />Зал</button>}>
             <Reorder.Group axis="y" values={halls} onReorder={setHalls} className="flex flex-col gap-2.5">
@@ -89,7 +89,7 @@ export default function WidgetEditor() {
           <Card title="Опции и оборудование" action={owner && <button className="btn btn-line btn-sm" onClick={() => setEquip([...equip, { id: 'opt' + Date.now().toString(36), n: '', d: '', price: 1000 }])}><Plus className="size-4" />Опция</button>}>
             <div className="flex flex-col gap-2">
               {equip.map((e, i) => (
-                <div key={e.id} className="grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1.2fr_1fr_120px_auto] gap-2 items-center">
+                <div key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_auto] gap-2 items-center">
                   <input className="field !h-11" value={e.n} placeholder="Название" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, n: x.target.value } : y))} />
                   <input className="field !h-11 hidden sm:block" value={e.d ?? ''} placeholder="Пояснение" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, d: x.target.value } : y))} />
                   <div className="relative"><input className="field !h-11 num pr-12 !w-[120px]" inputMode="numeric" disabled={!owner} value={e.price ? num(e.price) : ''} placeholder="0" onChange={x => setEquip(equip.map((y, j) => j === i ? { ...y, price: +x.target.value.replace(/\D/g, '') || 0 } : y))} /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none" style={{ color: 'var(--muted)' }}>₸/ч</span></div>
@@ -111,7 +111,7 @@ export default function WidgetEditor() {
               </div>
               <Field label="Заголовок"><input className="field" value={ann.title} maxLength={60} onChange={e => setAnn({ ...ann, title: e.target.value })} placeholder="Новогодний декор уже в студии ✨" /></Field>
               <Field label="Текст"><textarea className="field" rows={3} maxLength={280} value={ann.text} onChange={e => setAnn({ ...ann, text: e.target.value })} /></Field>
-              <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 items-end">
                 <Field label="Цвет"><Segmented value={ann.tone} onChange={v => setAnn({ ...ann, tone: v })} items={TONES.map(([k, c]) => [k, <span className="size-3.5 rounded-full block" style={{ background: c }} />])} /></Field>
                 <Field label="Показывать до"><input type="date" className="field" value={ann.until ?? ''} onChange={e => setAnn({ ...ann, until: e.target.value || undefined })} /></Field>
               </div>
@@ -119,7 +119,7 @@ export default function WidgetEditor() {
           </Card>
 
           <Card title={<span className="flex items-center gap-2"><Clock className="size-4" />Когда можно записаться</span>}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
               <HourSel label="Первый час записи" v={bk.open} set={v => setBk({ ...bk, open: v })} />
               <HourSel label="Студия закрывается" v={bk.close} set={v => setBk({ ...bk, close: v })} max={24} />
               <NumIn label="Мин. часов" v={bk.minHours} set={v => setBk({ ...bk, minHours: Math.max(1, Math.min(12, v)) })} />
@@ -170,7 +170,7 @@ function HallEditor({ h, set, owner, used, onRemove }: { h: Hall & { price: numb
         <div className="text-[11.5px] text-center" style={{ color: 'var(--faint)' }}>Фото вертикальное, от 1080 px. Видео до 50 МБ, 10–20 секунд без звука.</div>
       </div>
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-[1fr_140px] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3">
           <Field label="Название"><input className="field uppercase tracking-[.06em]" value={h.name} onChange={e => set({ name: e.target.value })} /></Field>
           <Field label="Цена за час"><input className="field num" inputMode="numeric" disabled={!owner} value={num(h.price)} onChange={e => set({ price: +e.target.value.replace(/\D/g, '') || 0 })} /></Field>
         </div>

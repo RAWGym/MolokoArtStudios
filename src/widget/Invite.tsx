@@ -67,7 +67,7 @@ export default function Invite({ id }: { id: string }) {
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button className="btn btn-primary h-12" onClick={ics}><CalendarPlus className="size-4" />В календарь</button>
-          <a className="btn btn-line h-12" href={STUDIO.wa} target="_blank" rel="noopener"><MessageCircle className="size-4" />Написать студии</a>
+          <a className="btn btn-line h-12" href={STUDIO.wa} target="_blank" rel="noopener"><MessageCircle className="size-4 shrink-0" />Написать студии</a>
         </div>
         <a href="/" className="block text-center mt-8 text-[13px] underline underline-offset-2" style={{ color: 'var(--muted)' }}>Забронировать свою съёмку в Moloko</a>
       </main>
