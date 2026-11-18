@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, BellOff, BellRing, CalendarPlus, Clock, Wallet, Ban, MoveRight, Inbox, UserPlus, Banknote, Check, Trash2, Volume2, Moon, Smartphone, Monitor, Download, RefreshCw, Globe } from 'lucide-react'
+import { Bell, BellOff, BellRing, CalendarPlus, Clock, Wallet, Ban, MoveRight, Inbox, UserPlus, Banknote, Check, Trash2, Volume2, Moon } from 'lucide-react'
 import { useStudio } from '../store'
 import { Card, PageHead } from '../common'
 import { Switch, Segmented, Empty, toast, cx } from '../../ui/kit'
 import { relTime, pad, dLabel, ymd } from '../../lib/format'
-import { notifyPermission, requestNotify, systemNotify, nativePlatform, nativeVersion, nativeCheckUpdate, type NotifyPerm } from '../../lib/native'
-import { fetchLatest, type AppsLatest } from '../../lib/apps'
+import { notifyPermission, requestNotify, systemNotify, type NotifyPerm } from '../../lib/native'
+import { AppsList } from '../Apps'
 import { useNotify, kindsFor, openPath, type NType } from '../notify'
 
 const ICON: Record<NType, typeof Bell> = { site: CalendarPlus, booking: CalendarPlus, remind: Clock, paid: Wallet, cancel: Ban, moved: MoveRight, request: Inbox, client: UserPlus, money: Banknote }
@@ -133,31 +133,5 @@ function Row({ icon: I, label, hint, children, tone }: { icon: typeof Bell; labe
 }
 
 function AppsCard() {
-  const [L, setL] = useState<AppsLatest | null>(null)
-  useEffect(() => { fetchLatest().then(setL).catch(() => setL(null)) }, [])
-  const plat = nativePlatform(), ver = nativeVersion()
-  const apps = [
-    { id: 'android', icon: Smartphone, title: 'Android', sub: 'Телефон и планшет', a: L?.android },
-    { id: 'windows', icon: Monitor, title: 'Windows', sub: 'Компьютер и ноутбук', a: L?.windows },
-  ] as const
-  return (
-    <Card title="Приложения CRM" delay={.15}>
-      {plat && <div className="rounded-2xl p-3 mb-3 flex items-center gap-3 text-[13.5px]" style={{ background: 'var(--card-2)' }}>
-        <RefreshCw className="size-4 shrink-0" style={{ color: 'var(--accent)' }} />
-        <span className="flex-1 min-w-0">Это приложение, версия <b className="num">{ver ?? '—'}</b>. Обновляется само.</span>
-        <button className="btn btn-line h-9 !px-3 text-[13px]" onClick={() => nativeCheckUpdate()}>Проверить</button>
-      </div>}
-      <div className="flex flex-col gap-2">
-        {apps.map(x => (
-          <a key={x.id} href={x.a?.url} aria-disabled={!x.a} onClick={e => { if (!x.a) { e.preventDefault(); toast('Сборка ещё готовится', 'info') } }}
-            className="flex items-center gap-3 rounded-2xl p-3 transition-colors hover:bg-[var(--card-2)]" style={{ boxShadow: '0 0 0 1px var(--line)' }}>
-            <span className="size-10 rounded-2xl grid place-items-center shrink-0" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}><x.icon className="size-5" /></span>
-            <span className="flex-1 min-w-0"><b className="text-[14px]">{x.title}</b><span className="block text-[12.5px]" style={{ color: 'var(--muted)' }}>{x.sub}{x.a ? ` · ${x.a.version}` : ''}</span></span>
-            <Download className="size-4 shrink-0" style={{ color: 'var(--muted)' }} />
-          </a>
-        ))}
-        <div className="flex items-start gap-2 text-[12px] mt-1" style={{ color: 'var(--muted)' }}><Globe className="size-3.5 shrink-0 mt-0.5" />Открывают только CRM, без страницы брони. Обновления ставятся сами.</div>
-      </div>
-    </Card>
-  )
+  return <Card title="Приложения CRM" delay={.15}><AppsList compact /></Card>
 }

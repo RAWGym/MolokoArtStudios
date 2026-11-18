@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download } from 'lucide-react'
 import { pagesFor, ROLE_LABEL, can } from './perm'
 import { useStudio } from './store'
 import { useUI, type Page } from './ui'
@@ -13,6 +13,7 @@ import { BookingForm } from './BookingForm'
 import { ClientDrawer } from './ClientDrawer'
 import { Palette } from './Palette'
 import { useNotify } from './notify'
+import { AppsSheet } from './Apps'
 import { InstallSheet, useInstall } from '../widget/Install'
 import Overview from './pages/Overview'
 import Schedule from './pages/Schedule'
@@ -147,6 +148,7 @@ function Shell() {
   const { theme, toggle } = useTheme()
   const install = useInstall()
   const [installOpen, setInstallOpen] = useState(false)
+  const [appsOpen, setAppsOpen] = useState(false)
   const owner = me?.role === 'owner'
   const allowed = pagesFor(me?.role)
   const nav = NAV.filter(n => allowed.includes(n.id))
@@ -174,7 +176,7 @@ function Shell() {
     <div className="min-h-dvh md:pl-[84px] xl:pl-[248px]">
       {/* side dock: icons on tablet, full labels on desktop */}
       <aside className="hidden md:flex fixed left-3 top-3 bottom-3 z-40 w-[68px] xl:w-[228px] flex-col glass !rounded-[26px] p-2.5 xl:p-3">
-        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5 [@media(max-height:960px)]:pb-3"><LogoMark size={40} /><span className="hidden xl:block font-display text-[15px] tracking-[.12em]">MOΛOKO</span></button>
+        <button onClick={() => go('overview')} className="flex items-center gap-2 px-1.5 xl:px-2 pt-2 pb-5 [@media(max-height:960px)]:pb-3"><LogoMark size={40} className="xl:hidden" /><Logo className="hidden xl:block h-[46px] w-auto" /></button>
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
           {nav.map((n, i) => {
             const on = current === n.id
@@ -195,6 +197,7 @@ function Shell() {
           })}
         </nav>
         <div className="pt-2 mt-2 border-t hairline flex flex-col gap-1">
+          {!IN_APP && <button onClick={() => setAppsOpen(true)} title="Скачать приложение" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] font-medium hover:bg-[var(--card-2)]" style={{ color: 'var(--accent)' }}><Download className="size-[18px] shrink-0" /><span className="hidden xl:block">Скачать приложение</span></button>}
           <a href="/" target="_blank" rel="noopener" title="Страница брони" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]"><ExternalLink className="size-[18px] shrink-0" /><span className="hidden xl:block">Страница брони</span></a>
           <button onClick={toggle} title="Тема" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]">{theme === 'dark' ? <Sun className="size-[18px] shrink-0" /> : <Moon className="size-[18px] shrink-0" />}<span className="hidden xl:block">{theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}</span></button>
           <div className="flex items-center gap-2.5 px-1.5 xl:px-2 pt-2">
@@ -266,6 +269,7 @@ function Shell() {
         <div className="mt-3 flex flex-col">
           {[
             { icon: theme === 'dark' ? Sun : Moon, label: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема', run: toggle },
+            ...(!IN_APP ? [{ icon: Download, label: 'Скачать приложение', run: () => { setMore(false); setAppsOpen(true) } }] : []),
             ...(!install.installed && !IN_APP ? [{ icon: Plus, label: 'Установить CRM на экран', run: () => { setMore(false); setInstallOpen(true) } }] : []),
             { icon: ExternalLink, label: 'Страница брони для клиентов', run: () => window.open('/', '_blank') },
             { icon: LogOut, label: 'Выйти', run: logout },
@@ -277,6 +281,7 @@ function Shell() {
       <BookingForm />
       <ClientDrawer />
       <Palette nav={nav} />
+      <AppsSheet open={appsOpen} onClose={() => setAppsOpen(false)} />
       <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} install={install} title="Moloko CRM" sub="Иконка на экране iPad или телефона — открывается как приложение" />
     </div>
   )
