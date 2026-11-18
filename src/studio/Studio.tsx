@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, KanbanSquare, Users, Wallet, BarChart3, Gift, Tags, ShieldCheck, History, Search, Plus, Sun, Moon, LogOut, MoreHorizontal, ExternalLink, Lock, Eye, EyeOff, Bell, LayoutTemplate, MessageSquareText, Inbox, RefreshCw, Download, LifeBuoy, Bug } from 'lucide-react'
 import { pagesFor, ROLE_LABEL, can } from './perm'
 import { useStudio } from './store'
 import { useUI, type Page } from './ui'
@@ -14,6 +14,7 @@ import { ClientDrawer } from './ClientDrawer'
 import { Palette } from './Palette'
 import { useNotify } from './notify'
 import { AppsSheet } from './Apps'
+import { HelpSheet, BugSheet } from './Support'
 import { InstallSheet, useInstall } from '../widget/Install'
 import Overview from './pages/Overview'
 import Schedule from './pages/Schedule'
@@ -149,6 +150,8 @@ function Shell() {
   const install = useInstall()
   const [installOpen, setInstallOpen] = useState(false)
   const [appsOpen, setAppsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [bugOpen, setBugOpen] = useState(false)
   const owner = me?.role === 'owner'
   const allowed = pagesFor(me?.role)
   const nav = NAV.filter(n => allowed.includes(n.id))
@@ -197,6 +200,10 @@ function Shell() {
           })}
         </nav>
         <div className="pt-2 mt-2 border-t hairline flex flex-col gap-1">
+          <div className="flex xl:gap-1 flex-col xl:flex-row">
+            <button onClick={() => setHelpOpen(true)} title="Нужна помощь" className="h-10 flex-1 flex items-center gap-3 xl:gap-2 rounded-[14px] px-3 text-[13px] text-[var(--muted)] hover:bg-[var(--card-2)] hover:text-[var(--ink)]"><LifeBuoy className="size-[18px] shrink-0" /><span className="hidden xl:block">Помощь</span></button>
+            <button onClick={() => setBugOpen(true)} title="Нашли ошибку?" className="h-10 flex-1 flex items-center gap-3 xl:gap-2 rounded-[14px] px-3 text-[13px] text-[var(--muted)] hover:bg-[var(--card-2)] hover:text-[var(--ink)]"><Bug className="size-[18px] shrink-0" /><span className="hidden xl:block">Ошибка?</span></button>
+          </div>
           {!IN_APP && <button onClick={() => setAppsOpen(true)} title="Скачать приложение" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] font-medium hover:bg-[var(--card-2)]" style={{ color: 'var(--accent)' }}><Download className="size-[18px] shrink-0" /><span className="hidden xl:block">Скачать приложение</span></button>}
           <a href="/" target="_blank" rel="noopener" title="Страница брони" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]"><ExternalLink className="size-[18px] shrink-0" /><span className="hidden xl:block">Страница брони</span></a>
           <button onClick={toggle} title="Тема" className="h-10 flex items-center gap-3 rounded-[14px] px-3 text-[13.5px] text-[var(--muted)] hover:bg-[var(--card-2)]">{theme === 'dark' ? <Sun className="size-[18px] shrink-0" /> : <Moon className="size-[18px] shrink-0" />}<span className="hidden xl:block">{theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}</span></button>
@@ -269,6 +276,8 @@ function Shell() {
         <div className="mt-3 flex flex-col">
           {[
             { icon: theme === 'dark' ? Sun : Moon, label: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема', run: toggle },
+            { icon: LifeBuoy, label: 'Нужна помощь', run: () => { setMore(false); setHelpOpen(true) } },
+            { icon: Bug, label: 'Нашли ошибку?', run: () => { setMore(false); setBugOpen(true) } },
             ...(!IN_APP ? [{ icon: Download, label: 'Скачать приложение', run: () => { setMore(false); setAppsOpen(true) } }] : []),
             ...(!install.installed && !IN_APP ? [{ icon: Plus, label: 'Установить CRM на экран', run: () => { setMore(false); setInstallOpen(true) } }] : []),
             { icon: ExternalLink, label: 'Страница брони для клиентов', run: () => window.open('/', '_blank') },
@@ -282,6 +291,8 @@ function Shell() {
       <ClientDrawer />
       <Palette nav={nav} />
       <AppsSheet open={appsOpen} onClose={() => setAppsOpen(false)} />
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} onBug={() => setBugOpen(true)} />
+      <BugSheet open={bugOpen} onClose={() => setBugOpen(false)} />
       <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} install={install} title="Moloko CRM" sub="Иконка на экране iPad или телефона — открывается как приложение" />
     </div>
   )

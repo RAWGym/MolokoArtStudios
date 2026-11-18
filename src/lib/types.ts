@@ -58,6 +58,7 @@ export interface Settings {
   announcement: { enabled: boolean; title: string; text: string; tone: 'gold' | 'accent' | 'wine'; until?: string }
   referral: { enabled: boolean; friendPct: number; referrerPct: number }
   reviewUrl: string
+  supportPhone?: string
   templates: { contact: string; remind: string; thanks: string; invite: string }
 }
 

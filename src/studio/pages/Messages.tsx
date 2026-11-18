@@ -19,11 +19,12 @@ export default function Messages() {
   const [T, setT] = useState<Settings['templates']>(() => ({ ...S.templates }))
   const [ref, setRef] = useState(() => ({ ...S.referral }))
   const [review, setReview] = useState(S.reviewUrl)
+  const [support, setSupport] = useState(S.supportPhone ?? '')
   const [k, setK] = useState<TemplateKey>('contact')
   const [combo, setCombo] = useState(false)
   const [busy, setBusy] = useState(false)
   const area = useRef<HTMLTextAreaElement>(null)
-  const dirty = JSON.stringify(T) !== JSON.stringify(S.templates) || JSON.stringify(ref) !== JSON.stringify(S.referral) || review !== S.reviewUrl
+  const dirty = JSON.stringify(T) !== JSON.stringify(S.templates) || JSON.stringify(ref) !== JSON.stringify(S.referral) || review !== S.reviewUrl || support !== (S.supportPhone ?? '')
   const preview = useMemo(() => messageFor(k, { ...S, templates: T, referral: ref, reviewUrl: review }, combo ? SAMPLE : SAMPLE.slice(0, 1), 'AB12CD'), [k, T, ref, review, combo, S])
 
   const insert = (v: string) => {
@@ -33,7 +34,7 @@ export default function Messages() {
     setT({ ...T, [k]: next })
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(pos + v.length, pos + v.length) })
   }
-  const save = async () => { setBusy(true); try { await saveSettings({ ...S, templates: T, referral: ref, reviewUrl: review.trim() }); toast('Шаблоны сохранены') } catch (e) { fail(e) } finally { setBusy(false) } }
+  const save = async () => { setBusy(true); try { await saveSettings({ ...S, templates: T, referral: ref, reviewUrl: review.trim(), supportPhone: support.trim() }); toast('Шаблоны сохранены') } catch (e) { fail(e) } finally { setBusy(false) } }
 
   return (
     <>
@@ -56,6 +57,7 @@ export default function Messages() {
           <Card title="Отзывы и приглашения друзей">
             <div className="flex flex-col gap-4">
               <Field label="Ссылка для отзыва" hint="2ГИС, Google или Instagram — подставится в {отзыв}"><div className="relative"><Star className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--gold)' }} /><input className="field !pl-10" value={review} onChange={e => setReview(e.target.value)} /></div></Field>
+              <Field label="WhatsApp поддержки" hint="Сюда уходят «Нужна помощь» и «Нашли ошибку?» из CRM. Пусто: номер студии"><input className="field num" inputMode="tel" value={support} onChange={e => setSupport(e.target.value)} placeholder="+7 701 155 55 71" /></Field>
               <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-[14px]"><Users className="size-4" />Реферальная программа</span><Switch on={ref.enabled} onChange={v => setRef({ ...ref, enabled: v })} /></div>
               <div className="grid grid-cols-2 gap-3" style={{ opacity: ref.enabled ? 1 : .5 }}>
                 <Field label="Скидка другу, %"><input className="field num" inputMode="numeric" value={ref.friendPct} onChange={e => setRef({ ...ref, friendPct: Math.min(50, +e.target.value.replace(/\D/g, '') || 0) })} /></Field>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode, type CSSProperties } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { X, Check, AlertTriangle, Info, Minus, Plus } from 'lucide-react'
 import clsx from 'clsx'
@@ -84,7 +85,8 @@ function useEsc(on: boolean, fn: () => void) {
 /** Bottom sheet on phones, centered dialog from md. */
 export function Sheet({ open, onClose, children, title, wide, className }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean; className?: string }) {
   useLockScroll(open); useEsc(open, onClose)
-  return (
+  // portal: page wrappers use transform/filter, which would trap position:fixed inside them
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[120] flex items-end md:items-center justify-center md:p-6">
@@ -107,14 +109,16 @@ export function Sheet({ open, onClose, children, title, wide, className }: { ope
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
 /** Right-hand drawer on tablet/desktop, full sheet on phones. */
 export function Drawer({ open, onClose, children, width = 480 }: { open: boolean; onClose: () => void; children: ReactNode; width?: number }) {
   useLockScroll(open); useEsc(open, onClose)
-  return (
+  // portal: page wrappers use transform/filter, which would trap position:fixed inside them
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[110]">
@@ -125,7 +129,8 @@ export function Drawer({ open, onClose, children, width = 480 }: { open: boolean
           </motion.aside>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
