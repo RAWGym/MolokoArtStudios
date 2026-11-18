@@ -488,4 +488,12 @@ grant execute on function public.moloko_role(), public.moloko_has(text[]) to aut
 grant execute on function public.moloko_book(jsonb), public.moloko_ref_info(text), public.moloko_invite(uuid), public.moloko_quote(text, int, int, int, text[], boolean) to anon, authenticated;
 grant execute on function public.moloko_me() to authenticated;
 
-alter publication supabase_realtime add table public.moloko_requests, public.moloko_money, public.moloko_certs;
+do $$
+declare t text;
+begin
+  foreach t in array array['moloko_requests','moloko_money','moloko_certs'] loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
